@@ -1,0 +1,924 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Paid Social — Gift Card Incentives</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.3/dist/chart.umd.min.js"></script>
+<style>
+/* ── FIELDS FONT (BambooHR proprietary) ── */
+@font-face { font-family:'Fields'; font-weight:400; font-display:swap;
+  src:url('fonts/Fields-Regular.woff2') format('woff2'); }
+@font-face { font-family:'Fields'; font-weight:600; font-display:swap;
+  src:url('fonts/Fields-SemiBold.woff2') format('woff2'); }
+@font-face { font-family:'Fields'; font-weight:700; font-display:swap;
+  src:url('fonts/Fields-Bold.woff2') format('woff2'); }
+
+/* ── FABRIC DESIGN TOKENS — LIGHT ── */
+:root {
+  --brand:      #2E7918; --brand-d: #215C10; --brand-bg: #EBF5E8; --brand-mid: #87C276;
+  --font-heading: 'Fields', Georgia, serif;
+  --font-body:    'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+  --text-strong: #38312f; --text-medium: #48413f; --text-weak: #676260;
+  --text-x-weak: #777270; --text-xx-weak: #868180; --text-inverted: #fff;
+  --surface-page: #f6f6f4; --surface-card: #fff; --surface-raised: #f5f4f1;
+  --surface-hover: #f5f4f1; --surface-brand: #EBF5E8;
+  --border-weak: #e4e3e0; --border-default: #d4d2d0; --border-strong: #c6c2bf;
+  --positive: #028a01; --positive-bg: #e8fde8;
+  --negative: #de1429; --negative-bg: #fdeaec;
+  --attention: #cd4a00; --attention-bg: #fff1e5;
+  --sp-4:4px; --sp-8:8px; --sp-12:12px; --sp-16:16px;
+  --sp-20:20px; --sp-24:24px; --sp-32:32px;
+  --r-xs:4px; --r-sm:8px; --r-md:12px; --r-lg:16px; --r-full:1000px;
+  --shadow-card: 1px 1px 0 1px rgba(0,0,0,.04);
+  --shadow-raised: 1px 1px 0 2px rgba(0,0,0,.03);
+  --shadow-float: 0 12px 28px rgba(0,0,0,.12), 0 0 0 1px var(--border-weak);
+  --shadow-btn: 0 1px 0 0 rgba(0,0,0,.05);
+
+  /* GC tier colors (from Tableau) */
+  --c-other: #df5857;
+  --c-50:    #4e79a8;
+  --c-75:    #78b7b2;
+  --c-100:   #f18f1c;
+  --c-150:   #59a14f;
+}
+
+[data-theme="dark"] {
+  --brand:#5ec25a; --brand-d:#7dd67a; --brand-bg:#172c14; --brand-mid:#3a7036;
+  --text-strong:#f5f4f1; --text-medium:#e4e3e0; --text-weak:#c6c2bf;
+  --text-x-weak:#868180; --text-xx-weak:#6b6663; --text-inverted:#38312f;
+  --surface-page:#151211; --surface-card:#1e1b1a; --surface-raised:#252220;
+  --surface-hover:#2d2a28; --surface-brand:#172c14;
+  --border-weak:#2d2a28; --border-default:#3d3937; --border-strong:#4d4946;
+  --positive:#5ec25a; --positive-bg:#172c14;
+  --negative:#f47077; --negative-bg:#3d1619;
+  --attention:#f47a3c; --attention-bg:#2d1a0e;
+  --shadow-card:1px 1px 0 1px rgba(0,0,0,.4);
+  --shadow-raised:1px 1px 0 2px rgba(0,0,0,.35);
+  --shadow-float:0 12px 28px rgba(0,0,0,.5), 0 0 0 1px var(--border-default);
+}
+
+*,*::before,*::after { box-sizing:border-box; margin:0; padding:0; }
+body {
+  font-family:var(--font-body); font-size:14px; color:var(--text-strong);
+  background:var(--surface-page); padding-bottom:32px; line-height:1.5;
+  transition:background .2s, color .2s;
+}
+
+/* ── HEADER ── */
+.header {
+  background:var(--surface-card); border-bottom:1px solid var(--border-weak);
+  padding:10px var(--sp-20); display:flex; align-items:center; gap:10px;
+  flex-wrap:wrap; position:sticky; top:0; z-index:300;
+  box-shadow:var(--shadow-card);
+}
+.logo {
+  font-family:var(--font-heading); font-size:18px; font-weight:700;
+  color:var(--text-strong); flex-shrink:0; letter-spacing:-.01em;
+}
+.sep { width:1px; height:22px; background:var(--border-weak); flex-shrink:0; }
+
+.fg { display:flex; align-items:center; gap:var(--sp-4); }
+.fl { font-size:11px; font-weight:600; color:var(--text-x-weak);
+  text-transform:uppercase; letter-spacing:.06em; white-space:nowrap; }
+
+input[type=date], select {
+  font-family:var(--font-body); font-size:13px; padding:4px var(--sp-8);
+  border:1px solid var(--border-default); border-radius:var(--r-xs);
+  background:var(--surface-card); color:var(--text-strong); outline:none;
+  cursor:pointer; transition:border-color .15s;
+}
+input[type=date]:focus, select:focus {
+  border-color:var(--brand); box-shadow:0 0 0 3px var(--brand-bg);
+}
+[data-theme="dark"] input[type=date], [data-theme="dark"] select { color-scheme:dark; }
+select { max-width:200px; }
+
+.btn {
+  font-family:var(--font-body); padding:5px var(--sp-16);
+  font-size:13px; font-weight:600; border:none;
+  border-radius:var(--r-full); cursor:pointer; transition:background .15s;
+  box-shadow:var(--shadow-btn);
+}
+.btn-green { background:var(--brand); color:#fff; }
+.btn-green:hover { background:var(--brand-d); }
+.btn-ghost {
+  background:transparent; color:var(--text-x-weak);
+  border:1px solid var(--border-default); box-shadow:none;
+}
+.btn-ghost:hover { border-color:var(--brand); color:var(--brand); }
+.upd { font-size:11px; color:var(--text-xx-weak); margin-left:auto; white-space:nowrap; }
+
+.theme-toggle {
+  width:34px; height:34px; border-radius:var(--r-full);
+  border:1px solid var(--border-default); background:var(--surface-raised);
+  cursor:pointer; display:flex; align-items:center; justify-content:center;
+  font-size:16px; flex-shrink:0; transition:background .15s, border-color .15s;
+}
+.theme-toggle:hover { border-color:var(--brand); background:var(--brand-bg); }
+
+/* ── TIER FILTER PILLS ── */
+.tier-pills {
+  padding:var(--sp-12) var(--sp-20);
+  background:var(--surface-card);
+  border-bottom:1px solid var(--border-weak);
+  display:flex; align-items:center; gap:var(--sp-8); flex-wrap:wrap;
+}
+.tier-pill {
+  padding:4px 14px; font-size:12px; font-weight:600;
+  border-radius:var(--r-full); border:2px solid transparent;
+  cursor:pointer; transition:all .15s; user-select:none;
+  opacity:.45;
+}
+.tier-pill.active { opacity:1; }
+.pill-other  { background:#fde8e8; color:var(--c-other); border-color:var(--c-other); }
+.pill-50     { background:#ddeaf6; color:var(--c-50);    border-color:var(--c-50); }
+.pill-75     { background:#e0f2f0; color:var(--c-75);    border-color:var(--c-75); }
+.pill-100    { background:#fef0e0; color:var(--c-100);   border-color:var(--c-100); }
+.pill-150    { background:#e3f4e0; color:var(--c-150);   border-color:var(--c-150); }
+
+[data-theme="dark"] .pill-other  { background:#3d1616; }
+[data-theme="dark"] .pill-50     { background:#162030; }
+[data-theme="dark"] .pill-75     { background:#162425; }
+[data-theme="dark"] .pill-100    { background:#2e1e08; }
+[data-theme="dark"] .pill-150    { background:#162012; }
+
+/* ── CONTENT ── */
+.content { max-width:1600px; margin:0 auto; padding:var(--sp-24) var(--sp-20); }
+.section-title {
+  font-family:var(--font-heading); font-size:15px; font-weight:700;
+  color:var(--text-strong); margin-bottom:var(--sp-12); letter-spacing:-.01em;
+}
+
+/* ── KPI TIER COLUMNS ── */
+.tier-grid {
+  display:grid;
+  grid-template-columns: repeat(5, 1fr);
+  gap:var(--sp-16);
+  margin-bottom:var(--sp-32);
+}
+@media (max-width:1100px) { .tier-grid { grid-template-columns:repeat(3,1fr); } }
+@media (max-width:700px)  { .tier-grid { grid-template-columns:repeat(2,1fr); } }
+
+.tier-card {
+  background:var(--surface-card); border-radius:var(--r-md);
+  border:1px solid var(--border-weak); box-shadow:var(--shadow-card);
+  overflow:hidden; transition:box-shadow .15s;
+}
+.tier-card:hover { box-shadow:var(--shadow-raised); }
+.tier-card-header {
+  padding:var(--sp-12) var(--sp-16) var(--sp-8);
+  font-weight:700; font-size:15px; border-bottom:2px solid;
+  display:flex; align-items:center; gap:var(--sp-8);
+}
+.tier-card-header .badge {
+  font-size:10px; font-weight:700; padding:2px 7px; border-radius:var(--r-full);
+  background:rgba(255,255,255,.25);
+}
+.tier-card-body { padding:var(--sp-12) var(--sp-16); }
+.kpi-row {
+  display:flex; justify-content:space-between; align-items:baseline;
+  padding:4px 0; border-bottom:1px solid var(--border-weak);
+}
+.kpi-row:last-child { border-bottom:none; }
+.kpi-label { font-size:12px; color:var(--text-weak); font-weight:500; }
+.kpi-val   { font-size:14px; font-weight:700; color:var(--text-strong); }
+.kpi-rate  { font-size:12px; color:var(--text-x-weak); }
+
+/* Tier header accent colors */
+.tier-other .tier-card-header { color:var(--c-other); border-color:var(--c-other); }
+.tier-50    .tier-card-header { color:var(--c-50);    border-color:var(--c-50); }
+.tier-75    .tier-card-header { color:var(--c-75);    border-color:var(--c-75); }
+.tier-100   .tier-card-header { color:var(--c-100);   border-color:var(--c-100); }
+.tier-150   .tier-card-header { color:var(--c-150);   border-color:var(--c-150); }
+
+/* ── CHARTS ── */
+.chart-row {
+  display:grid; gap:var(--sp-16);
+  margin-bottom:var(--sp-32);
+}
+.chart-row-2 { grid-template-columns:1fr 1fr; }
+@media (max-width:900px) { .chart-row-2 { grid-template-columns:1fr; } }
+
+.chart-card {
+  background:var(--surface-card); border-radius:var(--r-md);
+  border:1px solid var(--border-weak); box-shadow:var(--shadow-card);
+  padding:var(--sp-20);
+}
+.chart-card-header {
+  display:flex; align-items:center; justify-content:space-between;
+  margin-bottom:var(--sp-16);
+}
+.chart-card-title {
+  font-family:var(--font-heading); font-size:14px; font-weight:700;
+  color:var(--text-strong);
+}
+.chart-wrap { position:relative; }
+.chart-wrap canvas { display:block; }
+
+/* ── TABLE ── */
+.table-card {
+  background:var(--surface-card); border-radius:var(--r-md);
+  border:1px solid var(--border-weak); box-shadow:var(--shadow-card);
+  overflow:hidden; margin-bottom:var(--sp-32);
+}
+.table-card-header {
+  padding:var(--sp-16) var(--sp-20);
+  border-bottom:1px solid var(--border-weak);
+  display:flex; align-items:center; justify-content:space-between; gap:var(--sp-12);
+  flex-wrap:wrap;
+}
+.table-search {
+  font-family:var(--font-body); font-size:13px;
+  padding:5px 10px; border:1px solid var(--border-default);
+  border-radius:var(--r-full); background:var(--surface-raised);
+  color:var(--text-strong); outline:none; width:240px;
+  transition:border-color .15s;
+}
+.table-search:focus { border-color:var(--brand); box-shadow:0 0 0 3px var(--brand-bg); }
+.table-search::placeholder { color:var(--text-xx-weak); }
+table {
+  width:100%; border-collapse:collapse; font-size:13px;
+}
+thead th {
+  padding:10px 14px; text-align:left; font-weight:600;
+  color:var(--text-weak); font-size:11px; text-transform:uppercase;
+  letter-spacing:.05em; background:var(--surface-raised);
+  border-bottom:1px solid var(--border-weak); white-space:nowrap;
+  cursor:pointer; user-select:none;
+}
+thead th:hover { color:var(--text-strong); }
+thead th .sort-icon { opacity:.4; margin-left:3px; }
+thead th.sort-asc .sort-icon::after  { content:'▲'; }
+thead th.sort-desc .sort-icon::after { content:'▼'; }
+thead th:not(.sort-asc):not(.sort-desc) .sort-icon::after { content:'⬍'; }
+tbody tr { border-bottom:1px solid var(--border-weak); transition:background .1s; }
+tbody tr:last-child { border-bottom:none; }
+tbody tr:hover { background:var(--surface-hover); }
+tbody td { padding:9px 14px; color:var(--text-medium); }
+td.num { text-align:right; font-variant-numeric:tabular-nums; }
+td.rate { text-align:right; color:var(--text-x-weak); font-size:12px; font-variant-numeric:tabular-nums; }
+.tier-dot {
+  display:inline-block; width:10px; height:10px;
+  border-radius:50%; margin-right:6px; flex-shrink:0; vertical-align:middle;
+}
+.dot-other { background:var(--c-other); }
+.dot-50    { background:var(--c-50); }
+.dot-75    { background:var(--c-75); }
+.dot-100   { background:var(--c-100); }
+.dot-150   { background:var(--c-150); }
+.row-count { font-size:12px; color:var(--text-x-weak); }
+
+/* ── LOADING / EMPTY STATES ── */
+.loading {
+  text-align:center; padding:48px 20px;
+  color:var(--text-x-weak); font-size:14px;
+}
+.loading-spinner {
+  width:28px; height:28px; border:3px solid var(--border-weak);
+  border-top-color:var(--brand); border-radius:50%;
+  animation:spin .7s linear infinite; margin:0 auto 12px;
+}
+@keyframes spin { to { transform:rotate(360deg); } }
+
+/* ── TOOLTIP ── */
+.tooltip-card {
+  background:var(--surface-card); border:1px solid var(--border-weak);
+  border-radius:var(--r-sm); box-shadow:var(--shadow-float);
+  padding:10px 14px; font-size:12px; pointer-events:none;
+  position:absolute; z-index:999; min-width:160px;
+}
+.tooltip-row { display:flex; justify-content:space-between; gap:12px; padding:1px 0; }
+.tooltip-label { color:var(--text-x-weak); }
+.tooltip-val   { font-weight:700; color:var(--text-strong); }
+</style>
+</head>
+<body>
+
+<!-- ── HEADER ── -->
+<header class="header">
+  <span class="logo">Paid Social Gift Card Incentives</span>
+  <div class="sep"></div>
+
+  <div class="fg">
+    <span class="fl">Start</span>
+    <input type="date" id="startDate" value="2025-01-01">
+  </div>
+  <div class="fg">
+    <span class="fl">End</span>
+    <input type="date" id="endDate">
+  </div>
+  <button class="btn btn-green" onclick="applyFilters()">Apply</button>
+  <button class="btn btn-ghost" onclick="resetFilters()">Reset</button>
+
+  <div class="sep"></div>
+  <div class="fg">
+    <span class="fl">Metric</span>
+    <select id="metricSel">
+      <option value="mql1">MQL1</option>
+      <option value="mql2">MQL2</option>
+      <option value="sao" selected>SAO</option>
+      <option value="cw">CW</option>
+      <option value="dq">DQ</option>
+      <option value="cw_mrr">CW MRR ($)</option>
+    </select>
+  </div>
+
+  <span class="upd" id="updatedAt"></span>
+  <button class="theme-toggle" id="themeBtn" title="Toggle dark mode">🌙</button>
+</header>
+
+<!-- ── TIER PILLS ── -->
+<div class="tier-pills">
+  <span class="fl" style="margin-right:4px">Tiers:</span>
+  <span class="tier-pill pill-other active" data-tier="Other"  onclick="toggleTier(this)">Other</span>
+  <span class="tier-pill pill-50   active" data-tier="$50"   onclick="toggleTier(this)">$50</span>
+  <span class="tier-pill pill-75   active" data-tier="$75"   onclick="toggleTier(this)">$75</span>
+  <span class="tier-pill pill-100  active" data-tier="$100"  onclick="toggleTier(this)">$100</span>
+  <span class="tier-pill pill-150  active" data-tier="$150"  onclick="toggleTier(this)">$150</span>
+</div>
+
+<!-- ── MAIN CONTENT ── -->
+<div class="content">
+
+  <!-- KPI CARDS -->
+  <div class="section-title">Totals by Tier — Selected Period</div>
+  <div class="tier-grid" id="tierGrid">
+    <div class="loading"><div class="loading-spinner"></div>Loading…</div>
+  </div>
+
+  <!-- CHARTS ROW 1 -->
+  <div class="chart-row" style="grid-template-columns:1fr">
+    <div class="chart-card">
+      <div class="chart-card-header">
+        <span class="chart-card-title" id="lineTitle">SAO Over Time by Tier</span>
+      </div>
+      <div class="chart-wrap" style="height:320px">
+        <canvas id="lineChart"></canvas>
+      </div>
+    </div>
+  </div>
+
+  <!-- CHARTS ROW 2 -->
+  <div class="chart-row chart-row-2">
+    <div class="chart-card">
+      <div class="chart-card-header">
+        <span class="chart-card-title" id="stackedTitle">Stacked Monthly Totals</span>
+      </div>
+      <div class="chart-wrap" style="height:300px">
+        <canvas id="stackedBar"></canvas>
+      </div>
+    </div>
+    <div class="chart-card">
+      <div class="chart-card-header">
+        <span class="chart-card-title">MQL1 → SAO Conversion Rate by Tier</span>
+      </div>
+      <div class="chart-wrap" style="height:300px">
+        <canvas id="convBar"></canvas>
+      </div>
+    </div>
+  </div>
+
+  <!-- AD GROUP TABLE -->
+  <div class="table-card">
+    <div class="table-card-header">
+      <span class="section-title" style="margin:0">Ad Group Performance</span>
+      <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">
+        <input type="text" class="table-search" id="tableSearch" placeholder="Search ad groups…" oninput="renderTable()">
+        <span class="row-count" id="rowCount"></span>
+      </div>
+    </div>
+    <div style="overflow-x:auto">
+      <table id="agTable">
+        <thead>
+          <tr>
+            <th onclick="sortTable('gc_tier')"     data-col="gc_tier">     Tier <span class="sort-icon"></span></th>
+            <th onclick="sortTable('ad_group_name')" data-col="ad_group_name">Ad Group <span class="sort-icon"></span></th>
+            <th onclick="sortTable('ad_campaign_name')" data-col="ad_campaign_name">Campaign <span class="sort-icon"></span></th>
+            <th onclick="sortTable('mql1')"   data-col="mql1"   class="num sort-desc">MQL1 <span class="sort-icon"></span></th>
+            <th onclick="sortTable('sao')"    data-col="sao"    class="num">SAO <span class="sort-icon"></span></th>
+            <th onclick="sortTable('cw')"     data-col="cw"     class="num">CW <span class="sort-icon"></span></th>
+            <th onclick="sortTable('dq')"     data-col="dq"     class="num">DQ <span class="sort-icon"></span></th>
+            <th onclick="sortTable('cw_mrr')" data-col="cw_mrr" class="num">CW MRR <span class="sort-icon"></span></th>
+            <th class="num" style="cursor:default">MQL1→SAO</th>
+          </tr>
+        </thead>
+        <tbody id="agBody">
+          <tr><td colspan="9"><div class="loading"><div class="loading-spinner"></div>Loading…</div></td></tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
+
+</div><!-- /content -->
+
+<script>
+/* ─────────────────────────────────────────────────────────────
+   STATE
+───────────────────────────────────────────────────────────── */
+let ALL_DATA   = null;
+let sortCol    = 'mql1';
+let sortDir    = 'desc';
+let activeTiers = new Set(['Other','$50','$75','$100','$150']);
+let lineChart, stackedBarChart, convBarChart;
+
+const TIER_ORDER = ['Other','$50','$75','$100','$150'];
+const TIER_COLORS = {
+  'Other': '#df5857',
+  '$50':   '#4e79a8',
+  '$75':   '#78b7b2',
+  '$100':  '#f18f1c',
+  '$150':  '#59a14f',
+};
+const TIER_DOT = {
+  'Other':'dot-other', '$50':'dot-50', '$75':'dot-75', '$100':'dot-100', '$150':'dot-150'
+};
+
+const METRIC_LABELS = {
+  mql1:'MQL1', mql2:'MQL2', sao:'SAO', cw:'CW', dq:'DQ', cw_mrr:'CW MRR ($)'
+};
+
+/* ─────────────────────────────────────────────────────────────
+   LOAD DATA
+───────────────────────────────────────────────────────────── */
+async function loadData() {
+  try {
+    const r = await fetch('data/gc_data.json?_=' + Date.now());
+    if (!r.ok) throw new Error('HTTP ' + r.status);
+    ALL_DATA = await r.json();
+    document.getElementById('updatedAt').textContent =
+      'Updated ' + new Date(ALL_DATA.generated_at).toLocaleString(undefined,
+        {month:'short',day:'numeric',hour:'2-digit',minute:'2-digit'});
+    render();
+  } catch(e) {
+    document.getElementById('tierGrid').innerHTML =
+      `<div class="loading" style="grid-column:1/-1">⚠ Could not load data: ${e.message}</div>`;
+    console.error(e);
+  }
+}
+
+/* ─────────────────────────────────────────────────────────────
+   DATE HELPERS
+───────────────────────────────────────────────────────────── */
+function getDateRange() {
+  const startEl = document.getElementById('startDate');
+  const endEl   = document.getElementById('endDate');
+  const start = startEl.value ? new Date(startEl.value + 'T00:00:00') : new Date('2020-01-01');
+  const end   = endEl.value   ? new Date(endEl.value   + 'T23:59:59') : new Date();
+  return { start, end };
+}
+
+function inRange(monthStr, start, end) {
+  const d = new Date(monthStr);
+  return d >= start && d <= end;
+}
+
+/* ─────────────────────────────────────────────────────────────
+   FILTER HELPERS
+───────────────────────────────────────────────────────────── */
+function filteredMonthly() {
+  if (!ALL_DATA) return [];
+  const { start, end } = getDateRange();
+  return ALL_DATA.monthly.filter(r =>
+    activeTiers.has(r.gc_tier) && inRange(r.month, start, end)
+  );
+}
+
+function tierTotals() {
+  const totals = {};
+  TIER_ORDER.forEach(t => totals[t] = { mql1:0, mql2:0, sao:0, cw:0, dq:0, cw_mrr:0 });
+  filteredMonthly().forEach(r => {
+    if (!totals[r.gc_tier]) return;
+    totals[r.gc_tier].mql1    += +r.mql1 || 0;
+    totals[r.gc_tier].mql2    += +r.mql2 || 0;
+    totals[r.gc_tier].sao     += +r.sao  || 0;
+    totals[r.gc_tier].cw      += +r.cw   || 0;
+    totals[r.gc_tier].dq      += +r.dq   || 0;
+    totals[r.gc_tier].cw_mrr  += +r.cw_mrr || 0;
+  });
+  return totals;
+}
+
+/* ─────────────────────────────────────────────────────────────
+   RENDER ALL
+───────────────────────────────────────────────────────────── */
+function render() {
+  if (!ALL_DATA) return;
+  renderKPICards();
+  renderLineChart();
+  renderStackedBar();
+  renderConvBar();
+  renderTable();
+}
+
+/* ─────────────────────────────────────────────────────────────
+   KPI CARDS
+───────────────────────────────────────────────────────────── */
+function renderKPICards() {
+  const totals = tierTotals();
+  const grid   = document.getElementById('tierGrid');
+
+  const tierClass = { Other:'tier-other', '$50':'tier-50', '$75':'tier-75', '$100':'tier-100', '$150':'tier-150' };
+
+  let html = '';
+  TIER_ORDER.forEach(tier => {
+    if (!activeTiers.has(tier)) return;
+    const d = totals[tier];
+    const mqlSaoRate = d.mql1 > 0 ? (d.sao / d.mql1 * 100).toFixed(1) + '%' : '—';
+    const saoCwRate  = d.sao  > 0 ? (d.cw  / d.sao  * 100).toFixed(1) + '%' : '—';
+    const dqRate     = d.mql1 > 0 ? (d.dq  / d.mql1 * 100).toFixed(1) + '%' : '—';
+    html += `
+      <div class="tier-card ${tierClass[tier]}">
+        <div class="tier-card-header">${tier}</div>
+        <div class="tier-card-body">
+          <div class="kpi-row">
+            <span class="kpi-label">MQL1</span>
+            <span class="kpi-val">${fmt(d.mql1)}</span>
+          </div>
+          <div class="kpi-row">
+            <span class="kpi-label">SAO</span>
+            <span class="kpi-val">${fmt(d.sao)}</span>
+            <span class="kpi-rate">${mqlSaoRate} MQL→SAO</span>
+          </div>
+          <div class="kpi-row">
+            <span class="kpi-label">CW</span>
+            <span class="kpi-val">${fmt(d.cw)}</span>
+            <span class="kpi-rate">${saoCwRate} SAO→CW</span>
+          </div>
+          <div class="kpi-row">
+            <span class="kpi-label">DQ</span>
+            <span class="kpi-val">${fmt(d.dq)}</span>
+            <span class="kpi-rate">${dqRate} DQ rate</span>
+          </div>
+          <div class="kpi-row">
+            <span class="kpi-label">CW MRR</span>
+            <span class="kpi-val">${fmtMoney(d.cw_mrr)}</span>
+          </div>
+        </div>
+      </div>`;
+  });
+
+  grid.innerHTML = html || '<div style="grid-column:1/-1;color:var(--text-x-weak);padding:24px">No tiers selected.</div>';
+}
+
+/* ─────────────────────────────────────────────────────────────
+   LINE CHART — metric over time, one line per tier
+───────────────────────────────────────────────────────────── */
+function renderLineChart() {
+  const metric = document.getElementById('metricSel').value;
+  const label  = METRIC_LABELS[metric];
+  document.getElementById('lineTitle').textContent = `${label} Over Time by Tier`;
+
+  const monthly = filteredMonthly();
+
+  // Collect all months in range sorted ascending
+  const monthSet = new Set(monthly.map(r => r.month.slice(0,7)));
+  const months   = [...monthSet].sort();
+
+  // Group by tier → month → value
+  const byTier = {};
+  TIER_ORDER.forEach(t => { byTier[t] = {}; });
+  monthly.forEach(r => {
+    const m = r.month.slice(0,7);
+    if (!byTier[r.gc_tier]) return;
+    byTier[r.gc_tier][m] = (byTier[r.gc_tier][m] || 0) + (+r[metric] || 0);
+  });
+
+  const datasets = TIER_ORDER
+    .filter(t => activeTiers.has(t))
+    .map(t => ({
+      label: t,
+      data:  months.map(m => byTier[t][m] || 0),
+      borderColor:     TIER_COLORS[t],
+      backgroundColor: TIER_COLORS[t] + '22',
+      borderWidth: 2.5,
+      pointRadius: 3,
+      pointHoverRadius: 6,
+      tension: 0.35,
+      fill: false,
+    }));
+
+  const labels = months.map(m => {
+    const d = new Date(m + '-01');
+    return d.toLocaleDateString('en-US', {month:'short', year:'2-digit'});
+  });
+
+  if (lineChart) {
+    lineChart.data.labels   = labels;
+    lineChart.data.datasets = datasets;
+    lineChart.options.scales.y.title.text = label;
+    lineChart.update();
+    return;
+  }
+
+  lineChart = new Chart(document.getElementById('lineChart'), {
+    type: 'line',
+    data: { labels, datasets },
+    options: {
+      responsive: true, maintainAspectRatio: false,
+      interaction: { mode:'index', intersect:false },
+      plugins: {
+        legend: { position:'bottom', labels:{ boxWidth:12, padding:16, font:{size:12} } },
+        tooltip: {
+          callbacks: {
+            label: ctx => {
+              const v = metric === 'cw_mrr' ? fmtMoney(ctx.raw) : fmt(ctx.raw);
+              return ` ${ctx.dataset.label}: ${v}`;
+            }
+          }
+        }
+      },
+      scales: {
+        x: { grid:{ color:'rgba(0,0,0,.04)' }, ticks:{ font:{size:11}, maxRotation:45 } },
+        y: {
+          grid:{ color:'rgba(0,0,0,.04)' },
+          ticks:{ font:{size:11}, callback: v => metric==='cw_mrr' ? '$'+fmt(v) : fmt(v) },
+          title:{ display:true, text:label, font:{size:11} }
+        }
+      }
+    }
+  });
+}
+
+/* ─────────────────────────────────────────────────────────────
+   STACKED BAR — monthly totals by tier
+───────────────────────────────────────────────────────────── */
+function renderStackedBar() {
+  const metric = document.getElementById('metricSel').value;
+  const label  = METRIC_LABELS[metric];
+  document.getElementById('stackedTitle').textContent = `Monthly ${label} — Stacked by Tier`;
+
+  const monthly = filteredMonthly();
+  const monthSet = new Set(monthly.map(r => r.month.slice(0,7)));
+  const months   = [...monthSet].sort();
+
+  const byTier = {};
+  TIER_ORDER.forEach(t => { byTier[t] = {}; });
+  monthly.forEach(r => {
+    const m = r.month.slice(0,7);
+    if (!byTier[r.gc_tier]) return;
+    byTier[r.gc_tier][m] = (byTier[r.gc_tier][m] || 0) + (+r[metric] || 0);
+  });
+
+  const datasets = TIER_ORDER
+    .filter(t => activeTiers.has(t))
+    .map(t => ({
+      label: t,
+      data:  months.map(m => byTier[t][m] || 0),
+      backgroundColor: TIER_COLORS[t] + 'cc',
+      borderColor:     TIER_COLORS[t],
+      borderWidth: 1,
+    }));
+
+  const labels = months.map(m => {
+    const d = new Date(m + '-01');
+    return d.toLocaleDateString('en-US', {month:'short', year:'2-digit'});
+  });
+
+  if (stackedBarChart) {
+    stackedBarChart.data.labels   = labels;
+    stackedBarChart.data.datasets = datasets;
+    stackedBarChart.options.scales.y.title.text = label;
+    stackedBarChart.update();
+    return;
+  }
+
+  stackedBarChart = new Chart(document.getElementById('stackedBar'), {
+    type: 'bar',
+    data: { labels, datasets },
+    options: {
+      responsive: true, maintainAspectRatio: false,
+      plugins: {
+        legend: { position:'bottom', labels:{ boxWidth:12, padding:12, font:{size:11} } },
+        tooltip: { mode:'index', intersect:false }
+      },
+      scales: {
+        x: { stacked:true, grid:{ display:false }, ticks:{ font:{size:10}, maxRotation:45 } },
+        y: {
+          stacked:true, grid:{ color:'rgba(0,0,0,.04)' },
+          ticks:{ font:{size:11}, callback: v => metric==='cw_mrr' ? '$'+fmt(v) : fmt(v) },
+          title:{ display:true, text:label, font:{size:11} }
+        }
+      }
+    }
+  });
+}
+
+/* ─────────────────────────────────────────────────────────────
+   CONVERSION RATE BAR — MQL1→SAO per tier
+───────────────────────────────────────────────────────────── */
+function renderConvBar() {
+  const totals = tierTotals();
+  const tiers  = TIER_ORDER.filter(t => activeTiers.has(t));
+  const rates  = tiers.map(t => {
+    const d = totals[t];
+    return d.mql1 > 0 ? +(d.sao / d.mql1 * 100).toFixed(2) : 0;
+  });
+
+  if (convBarChart) {
+    convBarChart.data.labels   = tiers;
+    convBarChart.data.datasets[0].data            = rates;
+    convBarChart.data.datasets[0].backgroundColor = tiers.map(t => TIER_COLORS[t] + 'cc');
+    convBarChart.data.datasets[0].borderColor      = tiers.map(t => TIER_COLORS[t]);
+    convBarChart.update();
+    return;
+  }
+
+  convBarChart = new Chart(document.getElementById('convBar'), {
+    type: 'bar',
+    data: {
+      labels: tiers,
+      datasets: [{
+        label: 'MQL1→SAO %',
+        data:  rates,
+        backgroundColor: tiers.map(t => TIER_COLORS[t] + 'cc'),
+        borderColor:     tiers.map(t => TIER_COLORS[t]),
+        borderWidth: 1.5,
+        borderRadius: 5,
+      }]
+    },
+    options: {
+      responsive: true, maintainAspectRatio: false,
+      plugins: {
+        legend: { display:false },
+        tooltip: { callbacks: { label: ctx => ` ${ctx.raw.toFixed(1)}%` } }
+      },
+      scales: {
+        x: { grid:{ display:false }, ticks:{ font:{size:13, weight:'600'} } },
+        y: {
+          grid:{ color:'rgba(0,0,0,.04)' },
+          ticks:{ font:{size:11}, callback: v => v + '%' },
+          title:{ display:true, text:'MQL1 → SAO Rate', font:{size:11} }
+        }
+      }
+    }
+  });
+}
+
+/* ─────────────────────────────────────────────────────────────
+   TABLE
+───────────────────────────────────────────────────────────── */
+function renderTable() {
+  if (!ALL_DATA) return;
+  const query  = (document.getElementById('tableSearch').value || '').toLowerCase();
+  let rows = ALL_DATA.ad_groups
+    .filter(r => activeTiers.has(r.gc_tier))
+    .filter(r => !query ||
+      r.ad_group_name.toLowerCase().includes(query) ||
+      r.ad_campaign_name.toLowerCase().includes(query)
+    );
+
+  // Sort
+  rows = [...rows].sort((a, b) => {
+    let av = a[sortCol], bv = b[sortCol];
+    if (typeof av === 'string') {
+      av = av.toLowerCase(); bv = bv.toLowerCase();
+      return sortDir === 'asc' ? av.localeCompare(bv) : bv.localeCompare(av);
+    }
+    av = +av || 0; bv = +bv || 0;
+    return sortDir === 'asc' ? av - bv : bv - av;
+  });
+
+  document.getElementById('rowCount').textContent = `${rows.length} ad groups`;
+
+  const tbody = document.getElementById('agBody');
+  if (!rows.length) {
+    tbody.innerHTML = '<tr><td colspan="9" style="text-align:center;padding:24px;color:var(--text-x-weak)">No results</td></tr>';
+    return;
+  }
+
+  tbody.innerHTML = rows.map(r => {
+    const mqlSaoRate = +r.mql1 > 0 ? (+r.sao / +r.mql1 * 100).toFixed(1) + '%' : '—';
+    return `<tr>
+      <td><span class="tier-dot ${TIER_DOT[r.gc_tier]}"></span>${r.gc_tier}</td>
+      <td title="${r.ad_group_name}">${truncate(r.ad_group_name, 50)}</td>
+      <td title="${r.ad_campaign_name}">${truncate(r.ad_campaign_name, 45)}</td>
+      <td class="num">${fmt(r.mql1)}</td>
+      <td class="num">${fmt(r.sao)}</td>
+      <td class="num">${fmt(r.cw)}</td>
+      <td class="num">${fmt(r.dq)}</td>
+      <td class="num">${fmtMoney(r.cw_mrr)}</td>
+      <td class="rate">${mqlSaoRate}</td>
+    </tr>`;
+  }).join('');
+}
+
+function sortTable(col) {
+  if (sortCol === col) {
+    sortDir = sortDir === 'asc' ? 'desc' : 'asc';
+  } else {
+    sortCol = col;
+    sortDir = ['mql1','sao','cw','dq','cw_mrr'].includes(col) ? 'desc' : 'asc';
+  }
+  document.querySelectorAll('thead th').forEach(th => {
+    th.classList.remove('sort-asc','sort-desc');
+    if (th.dataset.col === col) th.classList.add('sort-' + sortDir);
+  });
+  renderTable();
+}
+
+/* ─────────────────────────────────────────────────────────────
+   CONTROLS
+───────────────────────────────────────────────────────────── */
+function applyFilters() {
+  if (lineChart)       { lineChart.destroy();       lineChart = null; }
+  if (stackedBarChart) { stackedBarChart.destroy(); stackedBarChart = null; }
+  if (convBarChart)    { convBarChart.destroy();    convBarChart = null; }
+  render();
+}
+
+function resetFilters() {
+  document.getElementById('startDate').value = '2025-01-01';
+  const today = new Date();
+  document.getElementById('endDate').value =
+    today.toISOString().slice(0,10);
+  document.getElementById('metricSel').value = 'sao';
+  activeTiers = new Set(TIER_ORDER);
+  document.querySelectorAll('.tier-pill').forEach(p => p.classList.add('active'));
+  applyFilters();
+}
+
+document.getElementById('metricSel').addEventListener('change', () => {
+  if (lineChart)       { lineChart.destroy();       lineChart = null; }
+  if (stackedBarChart) { stackedBarChart.destroy(); stackedBarChart = null; }
+  render();
+});
+
+function toggleTier(el) {
+  const tier = el.dataset.tier;
+  if (activeTiers.has(tier)) {
+    if (activeTiers.size <= 1) return; // keep at least one
+    activeTiers.delete(tier);
+    el.classList.remove('active');
+  } else {
+    activeTiers.add(tier);
+    el.classList.add('active');
+  }
+  applyFilters();
+}
+
+/* ─────────────────────────────────────────────────────────────
+   DARK MODE
+───────────────────────────────────────────────────────────── */
+(function() {
+  const saved = localStorage.getItem('theme');
+  if (saved === 'dark') document.documentElement.setAttribute('data-theme','dark');
+})();
+document.getElementById('themeBtn').addEventListener('click', () => {
+  const isDark = document.documentElement.getAttribute('data-theme') === 'dark';
+  if (isDark) {
+    document.documentElement.removeAttribute('data-theme');
+    document.getElementById('themeBtn').textContent = '🌙';
+    localStorage.setItem('theme','light');
+  } else {
+    document.documentElement.setAttribute('data-theme','dark');
+    document.getElementById('themeBtn').textContent = '☀️';
+    localStorage.setItem('theme','dark');
+  }
+  updateChartTheme();
+});
+
+function updateChartTheme() {
+  const isDark = document.documentElement.getAttribute('data-theme') === 'dark';
+  Chart.defaults.color     = isDark ? '#c6c2bf' : '#676260';
+  Chart.defaults.borderColor = isDark ? '#2d2a28' : 'rgba(0,0,0,.06)';
+  [lineChart, stackedBarChart, convBarChart].forEach(c => c && c.update());
+}
+
+/* ─────────────────────────────────────────────────────────────
+   FORMAT HELPERS
+───────────────────────────────────────────────────────────── */
+function fmt(n) {
+  const v = +n || 0;
+  return v.toLocaleString();
+}
+function fmtMoney(n) {
+  const v = +n || 0;
+  if (v === 0) return '—';
+  if (v >= 1000) return '$' + (v/1000).toFixed(1) + 'k';
+  return '$' + v.toFixed(0);
+}
+function truncate(str, max) {
+  return str && str.length > max ? str.slice(0, max) + '…' : (str || '');
+}
+
+/* ─────────────────────────────────────────────────────────────
+   INIT
+───────────────────────────────────────────────────────────── */
+// Set default end date to today
+document.getElementById('endDate').value = new Date().toISOString().slice(0,10);
+
+// Apply saved theme
+const isDark = document.documentElement.getAttribute('data-theme') === 'dark';
+if (isDark) {
+  document.getElementById('themeBtn').textContent = '☀️';
+  Chart.defaults.color      = '#c6c2bf';
+  Chart.defaults.borderColor = '#2d2a28';
+}
+
+loadData();
+</script>
+</body>
+</html>
