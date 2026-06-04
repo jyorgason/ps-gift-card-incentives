@@ -1,9 +1,11 @@
-name: Hourly Data Refresh
+# Data refresh is handled locally via macOS launchd.
+# See scripts/refresh_and_push.sh and scripts/com.bamboohr.ps-gift-card-incentives.plist
+# This workflow is kept as a manual fallback only (requires DATABRICKS_TOKEN secret if used).
+
+name: Manual Data Refresh (fallback)
 
 on:
-  schedule:
-    - cron: '0 * * * *'   # top of every hour
-  workflow_dispatch:        # allow manual trigger
+  workflow_dispatch:
 
 permissions:
   contents: write
@@ -13,23 +15,19 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-
       - uses: actions/setup-python@v5
         with:
           python-version: '3.11'
           cache: pip
-
       - name: Install dependencies
-        run: pip install requests
-
+        run: pip install databricks-sql-connector python-dotenv pandas
       - name: Generate data
         env:
-          DATABRICKS_HOST:      ${{ secrets.DATABRICKS_HOST }}
-          DATABRICKS_TOKEN:     ${{ secrets.DATABRICKS_TOKEN }}
-          DATABRICKS_HTTP_PATH: ${{ secrets.DATABRICKS_HTTP_PATH }}
-        run: python scripts/generate_data.py
-
-      - name: Commit & push data
+          DATABRICKS_SERVER_HOSTNAME: ${{ secrets.DATABRICKS_SERVER_HOSTNAME }}
+          DATABRICKS_HTTP_PATH:       ${{ secrets.DATABRICKS_HTTP_PATH }}
+          DATABRICKS_TOKEN:           ${{ secrets.DATABRICKS_TOKEN }}
+        run: python scripts/generate_data_token.py
+      - name: Commit & push
         run: |
           git config user.name  "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
