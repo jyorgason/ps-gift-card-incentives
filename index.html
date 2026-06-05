@@ -245,24 +245,6 @@ td.rate { text-align:right; color:var(--text-x-weak); font-size:12px;
   </div>
   <button class="btn btn-green" onclick="applyFilters()">Apply</button>
   <button class="btn btn-ghost" onclick="resetFilters()">Reset</button>
-  <div class="sep"></div>
-  <div class="fg">
-    <span class="fl">Metric</span>
-    <!-- Matches Tableau Parameter 5 exactly -->
-    <select id="metricSel">
-      <option value="mql1">MQL1</option>
-      <option value="mql2">MQL2</option>
-      <option value="sal">SAL</option>
-      <option value="tql">TQL</option>
-      <option value="sao" selected>SAO</option>
-      <option value="sao_ta">SAO TA</option>
-      <option value="cw">CW</option>
-      <option value="cw_ta">CW TA</option>
-      <option value="cw_mrr">CW MRR ($)</option>
-      <option value="cw_mrr_ta">CW MRR TA ($)</option>
-      <option value="cl">CL</option>
-    </select>
-  </div>
   <span class="upd" id="updatedAt"></span>
   <button class="theme-toggle" id="themeBtn" title="Toggle dark mode">🌙</button>
 </header>
@@ -290,10 +272,27 @@ td.rate { text-align:right; color:var(--text-x-weak); font-size:12px;
     <div class="loading" style="grid-column:1/-1"><div class="loading-spinner"></div>Loading…</div>
   </div>
 
-  <!-- LINE CHART -->
+  <!-- LINE CHART + STACKED BAR METRIC SELECTOR -->
   <div class="chart-card">
     <div class="chart-card-header">
       <span class="chart-card-title" id="lineTitle">SAO Over Time by Tier</span>
+      <div class="fg">
+        <span class="fl">Metric</span>
+        <!-- Matches Tableau Parameter 5 exactly -->
+        <select id="metricSel">
+          <option value="mql1">MQL1</option>
+          <option value="mql2">MQL2</option>
+          <option value="sal">SAL</option>
+          <option value="tql">TQL</option>
+          <option value="sao" selected>SAO</option>
+          <option value="sao_ta">SAO TA</option>
+          <option value="cw">CW</option>
+          <option value="cw_ta">CW TA</option>
+          <option value="cw_mrr">CW MRR ($)</option>
+          <option value="cw_mrr_ta">CW MRR TA ($)</option>
+          <option value="cl">CL</option>
+        </select>
+      </div>
     </div>
     <div style="position:relative;height:340px">
       <canvas id="lineChart"></canvas>
@@ -431,17 +430,24 @@ function externalVizTooltip(context, monthsArr) {
     <div class="vtt-divider">Top Ad Groups — ${METRIC_LABELS[metric]}</div>
     ${barsHtml}`;
 
-  // Position near cursor but keep inside viewport
+  // Position adjacent to cursor; el is position:fixed so coords are viewport-relative
   const canvas = chart.canvas;
   const rect   = canvas.getBoundingClientRect();
-  let x = rect.left + tooltip.caretX + 16;
-  let y = rect.top  + tooltip.caretY - 20 + window.scrollY;
+  const cx = rect.left + tooltip.caretX;
+  const cy = rect.top  + tooltip.caretY;
 
   el.style.display = 'block';
   const tw = el.offsetWidth  || 300;
   const th = el.offsetHeight || 200;
-  if (x + tw > window.innerWidth  - 12) x = rect.left + tooltip.caretX - tw - 16;
-  if (y + th > window.innerHeight + window.scrollY - 12) y = y - th + 40;
+
+  // Prefer right of cursor; flip left if would clip viewport
+  let x = cx + 10;
+  if (x + tw > window.innerWidth - 8) x = cx - tw - 10;
+  // Prefer aligning top to cursor; flip up if would clip viewport
+  let y = cy - 12;
+  if (y + th > window.innerHeight - 8) y = cy - th + 12;
+  if (y < 8) y = 8;
+
   el.style.left = x + 'px';
   el.style.top  = y + 'px';
 }
@@ -675,6 +681,32 @@ function renderStackedBar() {
 
   barMonths = months; // store for tooltip lookup
 
+  // Custom plugin: draw total above each stacked bar column
+  const stackedTotalPlugin = {
+    id: 'stackedTotal',
+    afterDatasetsDraw(chart) {
+      const { ctx, scales: { x, y } } = chart;
+      const totals = new Array(months.length).fill(0);
+      chart.data.datasets.forEach((ds, di) => {
+        if (chart.getDatasetMeta(di).hidden) return;
+        ds.data.forEach((v, i) => { totals[i] += +v || 0; });
+      });
+      const dark = document.documentElement.getAttribute('data-theme') === 'dark';
+      ctx.save();
+      ctx.font = 'bold 10px Inter, -apple-system, sans-serif';
+      ctx.fillStyle = dark ? '#c6c2bf' : '#38312f';
+      ctx.textAlign = 'center';
+      totals.forEach((total, i) => {
+        if (!total) return;
+        const xp = x.getPixelForValue(i);
+        const yp = y.getPixelForValue(total);
+        const disp = isMoney ? fmtMoney(total) : fmt(total);
+        ctx.fillText(disp, xp, yp - 5);
+      });
+      ctx.restore();
+    }
+  };
+
   if (stackedBarChart) {
     stackedBarChart.data.labels   = xlabels;
     stackedBarChart.data.datasets = datasets;
@@ -685,16 +717,27 @@ function renderStackedBar() {
 
   stackedBarChart = new Chart(document.getElementById('stackedBar'), {
     type: 'bar',
+    plugins: [ChartDataLabels, stackedTotalPlugin],
     data: { labels: xlabels, datasets },
     options: {
       responsive: true, maintainAspectRatio: false,
+      layout: { padding: { top: 20 } }, // room for total labels above bars
       plugins: {
         legend: { position:'bottom', labels:{ boxWidth:12, padding:12, font:{size:11} } },
         tooltip: {
           enabled: false,
           external: ctx => externalVizTooltip(ctx, barMonths),
         },
-        datalabels: { display: false }
+        datalabels: {
+          display: 'auto',
+          color: '#fff',
+          font: { size: 9, weight: '700' },
+          formatter: (v) => (!v || v === 0) ? null : (isMoney ? fmtMoney(v) : fmt(v)),
+          clamp: true,
+          clip: true,
+          anchor: 'center',
+          align: 'center',
+        }
       },
       scales: {
         x: { stacked:true, grid:{ display:false }, ticks:{ font:{size:10}, maxRotation:45 } },
@@ -776,11 +819,7 @@ function resetFilters() {
   document.querySelectorAll('.tier-pill').forEach(p => p.classList.add('active'));
   applyFilters();
 }
-document.getElementById('metricSel').addEventListener('change', () => {
-  if (lineChart)       { lineChart.destroy();       lineChart = null; }
-  if (stackedBarChart) { stackedBarChart.destroy(); stackedBarChart = null; }
-  render();
-});
+document.getElementById('metricSel').addEventListener('change', applyFilters);
 function toggleTier(el) {
   const tier = el.dataset.tier;
   if (activeTiers.has(tier)) {
