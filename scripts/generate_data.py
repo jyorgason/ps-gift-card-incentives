@@ -139,7 +139,7 @@ def fetch_monthly_adgroups(lookback_days: int) -> list[dict]:
     Only the metrics needed for tooltip display; limited to last 13 months
     to keep JSON size manageable.
     """
-    start = (date.today() - timedelta(days=395)).isoformat()  # ~13 months
+    start = (date.today() - timedelta(days=lookback_days)).isoformat()  # match main lookback
     return run_query(f"""
     SELECT
       {GC_TIER_SQL}                                           AS gc_tier,

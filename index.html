@@ -206,7 +206,7 @@ td.rate { text-align:right; color:var(--text-x-weak); font-size:12px;
   display:none; position:fixed; z-index:9999; pointer-events:none;
   background:var(--surface-card); border:1px solid var(--border-weak);
   border-radius:var(--r-md); box-shadow:var(--shadow-float);
-  padding:12px 14px; min-width:260px; max-width:340px; font-size:12px;
+  padding:12px 16px; min-width:320px; max-width:460px; font-size:12px;
 }
 .vtt-header { display:flex; align-items:center; gap:8px; margin-bottom:6px; }
 .vtt-dot { width:10px; height:10px; border-radius:50%; flex-shrink:0; }
@@ -220,7 +220,7 @@ td.rate { text-align:right; color:var(--text-x-weak); font-size:12px;
 .vtt-bar-row { display:grid; grid-template-columns:1fr auto;
   gap:4px; align-items:center; margin-bottom:5px; }
 .vtt-bar-label { font-size:11px; color:var(--text-medium); overflow:hidden;
-  text-overflow:ellipsis; white-space:nowrap; max-width:160px; }
+  text-overflow:ellipsis; white-space:nowrap; max-width:300px; }
 .vtt-bar-val { font-size:11px; font-weight:700; color:var(--text-strong);
   text-align:right; min-width:28px; font-variant-numeric:tabular-nums; }
 .vtt-bar-track { grid-column:1/-1; height:5px; background:var(--border-weak);
@@ -410,7 +410,7 @@ function externalVizTooltip(context, monthsArr) {
     ? rows.map(r => {
         const v   = +r[metric] || 0;
         const pct = maxVal > 0 ? (v / maxVal * 100).toFixed(1) : 0;
-        const lbl = r.ad_group_name.length > 34 ? r.ad_group_name.slice(0,34) + '…' : r.ad_group_name;
+        const lbl = r.ad_group_name.length > 52 ? r.ad_group_name.slice(0,52) + '…' : r.ad_group_name;
         const disp = isMoney ? fmtMoney(v) : fmt(v);
         return `<div class="vtt-bar-row">
           <span class="vtt-bar-label" title="${r.ad_group_name}">${lbl}</span>
