@@ -200,6 +200,33 @@ td.rate { text-align:right; color:var(--text-x-weak); font-size:12px;
   border-top-color:var(--brand); border-radius:50%; animation:spin .7s linear infinite;
   margin:0 auto 12px; }
 @keyframes spin { to { transform:rotate(360deg); } }
+
+/* ── VIZ-IN-TOOLTIP ── */
+#vizTooltip {
+  display:none; position:fixed; z-index:9999; pointer-events:none;
+  background:var(--surface-card); border:1px solid var(--border-weak);
+  border-radius:var(--r-md); box-shadow:var(--shadow-float);
+  padding:12px 14px; min-width:260px; max-width:340px; font-size:12px;
+}
+.vtt-header { display:flex; align-items:center; gap:8px; margin-bottom:6px; }
+.vtt-dot { width:10px; height:10px; border-radius:50%; flex-shrink:0; }
+.vtt-tier { font-weight:700; font-size:13px; color:var(--text-strong); }
+.vtt-month { color:var(--text-x-weak); font-size:12px; }
+.vtt-metric { font-size:12px; color:var(--text-medium); margin-bottom:10px; }
+.vtt-metric strong { color:var(--text-strong); }
+.vtt-divider { font-size:10px; font-weight:700; color:var(--text-xx-weak);
+  text-transform:uppercase; letter-spacing:.07em; margin-bottom:8px;
+  padding-bottom:5px; border-bottom:1px solid var(--border-weak); }
+.vtt-bar-row { display:grid; grid-template-columns:1fr auto;
+  gap:4px; align-items:center; margin-bottom:5px; }
+.vtt-bar-label { font-size:11px; color:var(--text-medium); overflow:hidden;
+  text-overflow:ellipsis; white-space:nowrap; max-width:160px; }
+.vtt-bar-val { font-size:11px; font-weight:700; color:var(--text-strong);
+  text-align:right; min-width:28px; font-variant-numeric:tabular-nums; }
+.vtt-bar-track { grid-column:1/-1; height:5px; background:var(--border-weak);
+  border-radius:3px; overflow:hidden; margin-top:-2px; margin-bottom:2px; }
+.vtt-bar-fill { height:100%; border-radius:3px; transition:width .2s; }
+.vtt-no-data { color:var(--text-xx-weak); font-style:italic; font-size:11px; }
 </style>
 </head>
 <body>
@@ -250,6 +277,9 @@ td.rate { text-align:right; color:var(--text-x-weak); font-size:12px;
   <span class="tier-pill pill-150  active" data-tier="$150"  onclick="toggleTier(this)">$150</span>
   <span class="tier-pill pill-other active" data-tier="Other" onclick="toggleTier(this)">Other</span>
 </div>
+
+<!-- VIZ-IN-TOOLTIP (positioned by JS) -->
+<div id="vizTooltip"></div>
 
 <!-- CONTENT -->
 <div class="content">
@@ -321,6 +351,9 @@ let sortCol  = 'mql1';
 let sortDir  = 'desc';
 let activeTiers = new Set(['$50','$75','$100','$150','Other']);
 let lineChart, stackedBarChart;
+let AG_LOOKUP  = {};   // tier|month → sorted ad group rows
+let lineMonths = [];   // ISO month strings for line chart (parallel to x-labels)
+let barMonths  = [];   // ISO month strings for stacked bar chart
 
 /* Tableau sort order */
 const TIER_ORDER = ['$50','$75','$100','$150','Other'];
@@ -334,6 +367,84 @@ const METRIC_LABELS = {
   cw_mrr:'CW MRR', cw_mrr_ta:'CW MRR TA', cl:'CL'
 };
 const MONEY_METRICS = new Set(['cw_mrr','cw_mrr_ta']);
+
+/* ── AD GROUP LOOKUP ── */
+function buildAdGroupLookup() {
+  AG_LOOKUP = {};
+  if (!ALL_DATA || !ALL_DATA.monthly_adgroups) return;
+  ALL_DATA.monthly_adgroups.forEach(r => {
+    const key = r.gc_tier + '|' + r.month.slice(0,7);
+    if (!AG_LOOKUP[key]) AG_LOOKUP[key] = [];
+    AG_LOOKUP[key].push(r);
+  });
+}
+
+/* ── VIZ-IN-TOOLTIP ── */
+function externalVizTooltip(context, monthsArr) {
+  const { chart, tooltip } = context;
+  const el = document.getElementById('vizTooltip');
+
+  if (tooltip.opacity === 0 || !tooltip.dataPoints?.length) {
+    el.style.display = 'none';
+    return;
+  }
+
+  const dp      = tooltip.dataPoints[0];
+  const tier    = dp.dataset.label;
+  const idx     = dp.dataIndex;
+  const metric  = document.getElementById('metricSel').value;
+  const isMoney = MONEY_METRICS.has(metric);
+  const val     = isMoney ? fmtMoney(dp.raw) : fmt(dp.raw);
+  const monthISO = monthsArr[idx] || '';
+  const monthLbl = dp.label;
+  const color    = TIER_COLORS[tier] || '#888';
+
+  // Ad group rows for this tier+month, sorted by metric desc
+  const rows = (AG_LOOKUP[tier + '|' + monthISO] || [])
+    .filter(r => (+r[metric] || 0) > 0)
+    .sort((a, b) => (+b[metric] || 0) - (+a[metric] || 0))
+    .slice(0, 8);
+
+  const maxVal = rows.length ? (+rows[0][metric] || 0) : 1;
+
+  let barsHtml = rows.length
+    ? rows.map(r => {
+        const v   = +r[metric] || 0;
+        const pct = maxVal > 0 ? (v / maxVal * 100).toFixed(1) : 0;
+        const lbl = r.ad_group_name.length > 34 ? r.ad_group_name.slice(0,34) + '…' : r.ad_group_name;
+        const disp = isMoney ? fmtMoney(v) : fmt(v);
+        return `<div class="vtt-bar-row">
+          <span class="vtt-bar-label" title="${r.ad_group_name}">${lbl}</span>
+          <span class="vtt-bar-val">${disp}</span>
+          <div class="vtt-bar-track"><div class="vtt-bar-fill" style="width:${pct}%;background:${color}"></div></div>
+        </div>`;
+      }).join('')
+    : `<div class="vtt-no-data">No ad group data for this period</div>`;
+
+  el.innerHTML = `
+    <div class="vtt-header">
+      <div class="vtt-dot" style="background:${color}"></div>
+      <span class="vtt-tier">${tier}</span>
+      <span class="vtt-month">${monthLbl}</span>
+    </div>
+    <div class="vtt-metric">${METRIC_LABELS[metric]}: <strong>${val}</strong></div>
+    <div class="vtt-divider">Top Ad Groups — ${METRIC_LABELS[metric]}</div>
+    ${barsHtml}`;
+
+  // Position near cursor but keep inside viewport
+  const canvas = chart.canvas;
+  const rect   = canvas.getBoundingClientRect();
+  let x = rect.left + tooltip.caretX + 16;
+  let y = rect.top  + tooltip.caretY - 20 + window.scrollY;
+
+  el.style.display = 'block';
+  const tw = el.offsetWidth  || 300;
+  const th = el.offsetHeight || 200;
+  if (x + tw > window.innerWidth  - 12) x = rect.left + tooltip.caretX - tw - 16;
+  if (y + th > window.innerHeight + window.scrollY - 12) y = y - th + 40;
+  el.style.left = x + 'px';
+  el.style.top  = y + 'px';
+}
 
 /* ── LOAD ── */
 async function loadData() {
@@ -393,6 +504,7 @@ function truncate(s,max) { return s&&s.length>max ? s.slice(0,max)+'…' : (s||'
 /* ── RENDER ALL ── */
 function render() {
   if (!ALL_DATA) return;
+  buildAdGroupLookup();
   renderKPICards();
   renderLineChart();
   renderStackedBar();
@@ -492,22 +604,12 @@ function renderLineChart() {
     return MON[+mo-1] + " '" + y.slice(2);
   });
 
-  /* Tooltip matching Tableau format: "Gift Card Incentive / Month / Metric" */
-  const tooltipCallbacks = {
-    title: () => '',
-    label: ctx => {
-      const tier  = ctx.dataset.label;
-      const month = xlabels[ctx.dataIndex];
-      const val   = isMoney ? fmtMoney(ctx.raw) : fmt(ctx.raw);
-      return [`Gift Card Incentive:  ${tier}`, `Month:  ${month}`, `Metric:  ${val}`];
-    }
-  };
+  lineMonths = months; // store for tooltip lookup
 
   if (lineChart) {
     lineChart.data.labels   = xlabels;
     lineChart.data.datasets = datasets;
     lineChart.options.scales.y.title.text = label;
-    lineChart.options.plugins.tooltip.callbacks = tooltipCallbacks;
     lineChart.update();
     return;
   }
@@ -519,14 +621,14 @@ function renderLineChart() {
     options: {
       responsive: true, maintainAspectRatio: false,
       layout: { padding: { top: 24 } },
-      interaction: { mode:'point', intersect:true },
+      interaction: { mode:'nearest', intersect:true },
       plugins: {
         legend: { position:'bottom', labels:{ boxWidth:12, padding:16, font:{size:12} } },
         tooltip: {
-          callbacks: tooltipCallbacks,
-          bodyFont: { weight:'bold' },
+          enabled: false,
+          external: ctx => externalVizTooltip(ctx, lineMonths),
         },
-        datalabels: { /* global defaults; per-dataset overrides above */}
+        datalabels: {}
       },
       scales: {
         x: { grid:{ color:'rgba(0,0,0,.04)' }, ticks:{ font:{size:11}, maxRotation:45 } },
@@ -571,22 +673,12 @@ function renderStackedBar() {
     return MON[+mo-1] + " '" + y.slice(2);
   });
 
-  /* Tableau tooltip format */
-  const tooltipCallbacks = {
-    title: () => '',
-    label: ctx => {
-      const tier  = ctx.dataset.label;
-      const month = xlabels[ctx.dataIndex];
-      const val   = isMoney ? fmtMoney(ctx.raw) : fmt(ctx.raw);
-      return [`Gift Card Incentive:  ${tier}`, `Month:  ${month}`, `Metric:  ${val}`];
-    }
-  };
+  barMonths = months; // store for tooltip lookup
 
   if (stackedBarChart) {
     stackedBarChart.data.labels   = xlabels;
     stackedBarChart.data.datasets = datasets;
     stackedBarChart.options.scales.y.title.text = label;
-    stackedBarChart.options.plugins.tooltip.callbacks = tooltipCallbacks;
     stackedBarChart.update();
     return;
   }
@@ -598,7 +690,10 @@ function renderStackedBar() {
       responsive: true, maintainAspectRatio: false,
       plugins: {
         legend: { position:'bottom', labels:{ boxWidth:12, padding:12, font:{size:11} } },
-        tooltip: { callbacks: tooltipCallbacks },
+        tooltip: {
+          enabled: false,
+          external: ctx => externalVizTooltip(ctx, barMonths),
+        },
         datalabels: { display: false }
       },
       scales: {

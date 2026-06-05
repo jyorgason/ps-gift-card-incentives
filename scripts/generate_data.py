@@ -133,6 +133,39 @@ def fetch_ad_group_totals(lookback_days: int) -> list[dict]:
     """)
 
 
+def fetch_monthly_adgroups(lookback_days: int) -> list[dict]:
+    """
+    Tier × month × ad_group breakdown — powers the VizInTooltip bar chart.
+    Only the metrics needed for tooltip display; limited to last 13 months
+    to keep JSON size manageable.
+    """
+    start = (date.today() - timedelta(days=395)).isoformat()  # ~13 months
+    return run_query(f"""
+    SELECT
+      {GC_TIER_SQL}                                           AS gc_tier,
+      DATE_FORMAT(DATE_TRUNC('month', `DATE`), 'yyyy-MM-dd') AS month,
+      AD_GROUP_NAME                                           AS ad_group_name,
+      SUM(MQL1)                    AS mql1,
+      SUM(SAO)                     AS sao,
+      SUM(CW)                      AS cw,
+      CAST(SUM(CW_MRR) AS DOUBLE)  AS cw_mrr,
+      SUM(MQL1_TA)                 AS mql1_ta,
+      SUM(SAO_TA)                  AS sao_ta,
+      SUM(CW_TA)                   AS cw_ta,
+      CAST(SUM(CW_MRR_TA) AS DOUBLE) AS cw_mrr_ta,
+      SUM(SAL)                     AS sal,
+      SUM(TQL)                     AS tql,
+      SUM(CL)                      AS cl,
+      SUM(DQ)                      AS dq
+    FROM {TABLE}
+    WHERE CHANNEL_NAME = 'Paid Social'
+      AND ATTRIBUTION_MODEL = 'First 90 Days'
+      AND `DATE` >= '{start}'
+    GROUP BY 1, 2, 3
+    ORDER BY 2 DESC, 1, 4 DESC
+    """)
+
+
 def main():
     ts = datetime.utcnow().isoformat()
     print(f"[{ts}] Fetching monthly-by-tier ({LOOKBACK_DAYS} days)…")
@@ -143,10 +176,15 @@ def main():
     ad_groups = fetch_ad_group_totals(LOOKBACK_DAYS)
     print(f"  → {len(ad_groups)} rows")
 
+    print(f"[{ts}] Fetching monthly ad-group breakdown (for tooltip)…")
+    monthly_adgroups = fetch_monthly_adgroups(LOOKBACK_DAYS)
+    print(f"  → {len(monthly_adgroups)} rows")
+
     output = {
-        "generated_at": datetime.utcnow().strftime("%Y-%m-%dT%H:%M:%SZ"),
-        "monthly":   monthly,
-        "ad_groups": ad_groups,
+        "generated_at":    datetime.utcnow().strftime("%Y-%m-%dT%H:%M:%SZ"),
+        "monthly":         monthly,
+        "ad_groups":       ad_groups,
+        "monthly_adgroups": monthly_adgroups,
     }
 
     os.makedirs(os.path.dirname(OUTPUT_FILE), exist_ok=True)
