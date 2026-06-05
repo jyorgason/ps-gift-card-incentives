@@ -100,6 +100,7 @@ def fetch_monthly_by_tier(lookback_days: int) -> list[dict]:
       SUM(DQ)        AS dq
     FROM {TABLE}
     WHERE CHANNEL_NAME = 'Paid Social'
+      AND ATTRIBUTION_MODEL = 'First 90 Days'
       AND `DATE` >= '{start}'
     GROUP BY 1, 2
     ORDER BY 2 DESC, 1
@@ -125,6 +126,7 @@ def fetch_ad_group_totals(lookback_days: int) -> list[dict]:
       CAST(SUM(CW_MRR) AS DOUBLE) AS cw_mrr
     FROM {TABLE}
     WHERE CHANNEL_NAME = 'Paid Social'
+      AND ATTRIBUTION_MODEL = 'First 90 Days'
       AND `DATE` >= '{start}'
     GROUP BY 1, 2, 3
     ORDER BY 1, 4 DESC
