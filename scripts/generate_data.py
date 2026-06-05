@@ -70,6 +70,8 @@ def run_query(sql_text: str) -> list[dict]:
 
 def fetch_monthly_by_tier(lookback_days: int) -> list[dict]:
     start = (date.today() - timedelta(days=lookback_days)).isoformat()
+    # No GC filter here — ALL paid social rows included so "Other" tier is populated.
+    # "Other" = any paid social row whose ad_group_name/utm_campaign has no GC amount.
     return run_query(f"""
     SELECT
       {GC_TIER_SQL} AS gc_tier,
@@ -82,7 +84,6 @@ def fetch_monthly_by_tier(lookback_days: int) -> list[dict]:
       CAST(SUM(booked_commissionable_mrr) AS DOUBLE) AS cw_mrr
     FROM analytics_us_east_2_certified_models.semantics.view_marketing_lead_gen_to_sales_funnel_stage_attribution
     WHERE channel_name_group = 'Paid Social'
-      AND {GC_FILTER_SQL}
       AND attribution_stage_date >= '{start}'
     GROUP BY 1, 2
     ORDER BY 2 DESC, 1
