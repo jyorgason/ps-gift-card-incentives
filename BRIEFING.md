@@ -2,7 +2,7 @@
 
 **Repo:** `jyorgason/ps-gift-card-incentives`  
 **Live URL:** https://jyorgason.github.io/ps-gift-card-incentives/  
-**Last updated:** 2026-06-04  
+**Last updated:** 2026-06-05  
 
 ---
 
@@ -32,26 +32,43 @@ The workbook contains 11 dashboards total; this project specifically recreates t
 
 **Databricks table:**
 ```
-analytics_us_east_2_certified_models.semantics.view_marketing_lead_gen_to_sales_funnel_stage_attribution
+analytics_us_east_2_production_sandbox_mktg.jyorgason.marketing_funnel
 ```
 
-**Filter:** `channel_name_group = 'Paid Social'` + Gift Card classification filter (see §4)
+**Channel filter:** `WHERE CHANNEL_NAME = 'Paid Social'`
 
-**Key columns used:**
-| Tableau field       | Databricks column                 | Notes                          |
-|---------------------|-----------------------------------|--------------------------------|
-| FUNNEL_STAGE        | attribution_stage_type            | MQL1, MQL2, OPP CREATION, etc. |
-| DATE                | attribution_stage_date            |                                |
-| MQL1                | mql1_counter                      | SUM = MQL1 count               |
-| MQL2                | mql2_counter                      |                                |
-| SAO                 | opportunity_creation_counter      | Concurrent zero-out applied    |
-| CW                  | closed_won_counter                 | Concurrent zero-out applied    |
-| DQ                  | disqualified_counter              |                                |
-| CW_MRR              | booked_commissionable_mrr         |                                |
-| AD_GROUP_NAME       | ad_group_name                     |                                |
-| AD_GROUP_ID         | ad_group_id                       |                                |
-| UTM_CAMPAIGN        | utm_campaign                      |                                |
-| SUBCHANNEL_NAME     | subchannel_name                   |                                |
+This is the same underlying table as the Tableau workbook's "Marketing Funnel" data source. Fields map 1:1 — no translation layer needed.
+
+> ⚠️ **Correction (2026-06-05):** The initial build incorrectly used the certified view
+> `analytics_us_east_2_certified_models.semantics.view_marketing_lead_gen_to_sales_funnel_stage_attribution`.
+> That view uses counter columns with different names and was missing TA fields, SAL, TQL, CL.
+> All data prior to the 2026-06-05 refresh was wrong.
+
+**Key columns (exact Tableau field names):**
+| Field         | Type    | Notes                                    |
+|---------------|---------|------------------------------------------|
+| DATE          | date    | Attribution stage date — used for all time grouping |
+| CHANNEL_NAME  | string  | Filter: `= 'Paid Social'`               |
+| AD_GROUP_NAME | string  | Used for GC tier classification          |
+| AD_GROUP_ID   | string  | Used for GC tier classification (legacy IDs) |
+| UTM_CAMPAIGN  | string  | Used for $150 tier classification        |
+| MQL1          | int     | 0/1 per row                             |
+| MQL2          | int     | 0/1 per row                             |
+| MQL1_TA       | int     | Tactical attribution variant            |
+| MQL2_TA       | int     | Tactical attribution variant            |
+| SAL           | int     | 0/1 per row                             |
+| SAL_TA        | int     |                                          |
+| TQL           | int     | 0/1 per row                             |
+| TQL_TA        | int     |                                          |
+| SAO           | int     | 0/1 per row                             |
+| SAO_TA        | int     | Tactical attribution variant            |
+| CW            | int     | 0/1 per row                             |
+| CW_TA         | int     | Tactical attribution variant            |
+| CW_MRR        | decimal | MRR for closed won rows                 |
+| CW_MRR_TA     | decimal | TA variant                              |
+| CL            | int     | Closed Lost 0/1                         |
+| DQ            | int     | Disqualified 0/1                        |
+| MQL_SOURCE    | string  | 'MQL1' or 'MQL2' — see §Known Divergences |
 
 **Lookback:** 2 years (730 days) on each refresh
 
@@ -231,8 +248,20 @@ Sample from Databricks query (2024-01-01 → present):
 
 ---
 
-## 13. Changelog
+## 13. Known Divergences from Tableau
+
+| # | Metric | Tableau behavior | Web report behavior | Approved |
+|---|--------|-----------------|---------------------|----------|
+| 1 | MQL1→SAO rate | `SUM(SAO where MQL_SOURCE='MQL1') / SUM(MQL1)` — only MQL1-sourced SAOs in numerator | `SUM(SAO) / SUM(MQL1)` — all SAOs regardless of source | Yes, 2026-06-05 |
+
+If SAO rate in web report is higher than Tableau, this is the reason. The difference is MQL2-sourced SAOs being included in the web report's numerator.
+
+---
+
+## 14. Changelog
 
 | Date       | Change                                         |
 |------------|------------------------------------------------|
+| 2026-06-05 | Corrected data source to `marketing_funnel` sandbox table. Fixed "Other" tier data in both monthly and ad group queries. Added all TA fields (SAO_TA, CW_TA, CW_MRR_TA, etc.), SAL, TQL, CL. Documented SAO rate divergence. |
+| 2026-06-04 | Audit pass: fixed scorecard layout (rates first), metric dropdown to match Tableau, added data labels to line chart, corrected tooltip format, removed extra conversion rate bar chart, fixed tier sort order. |
 | 2026-06-04 | Initial project setup; Tableau workbook audited; Databricks schema confirmed; full web app built; GitHub repo created |

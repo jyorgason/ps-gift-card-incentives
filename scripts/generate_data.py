@@ -3,8 +3,18 @@ PS Gift Card Incentives — Data Generation Script
 Uses the Databricks OAuth connector (same auth as the Workbench connector).
 Writes data/gc_data.json for the HTML report.
 
+Data source: analytics_us_east_2_production_sandbox_mktg.jyorgason.marketing_funnel
+  - Row-level marketing funnel attribution table (matches the Tableau "Marketing Funnel"
+    data source exactly — same field names, same funnel logic)
+  - Scoped to CHANNEL_NAME = 'Paid Social'
+
 Run locally:   python scripts/generate_data.py
 Automated via: ~/Library/LaunchAgents/com.bamboohr.ps-gift-card-incentives.plist
+
+NOTE — Known divergence from Tableau (approved 2026-06-05):
+  MQL1>SAO rate = SUM(SAO) / SUM(MQL1)  [all SAOs in denominator]
+  Tableau uses  = SUM(SAO where MQL_SOURCE='MQL1') / SUM(MQL1)  [MQL1-sourced only]
+  This means our rate is slightly higher than Tableau's. Intentional.
 """
 
 import os
@@ -12,7 +22,7 @@ import json
 import sys
 from datetime import date, datetime, timedelta
 
-# Use same connector as /Users/jyorgason/Desktop/Workbench/Databricks Connector
+# Reuse the Workbench Databricks Connector for auth
 sys.path.insert(0, os.path.expanduser(
     "~/Desktop/Workbench/Databricks Connector/your-project/src"
 ))
@@ -26,34 +36,28 @@ load_dotenv(os.path.expanduser(
 
 SERVER_HOSTNAME = os.getenv("DATABRICKS_SERVER_HOSTNAME")
 HTTP_PATH       = os.getenv("DATABRICKS_HTTP_PATH")
+TABLE           = "analytics_us_east_2_production_sandbox_mktg.jyorgason.marketing_funnel"
 OUTPUT_FILE     = os.path.join(os.path.dirname(__file__), "..", "data", "gc_data.json")
 
 LOOKBACK_DAYS = 730  # 2 years
 
 # ---------------------------------------------------------------------------
-# Gift Card Incentive classification (matches Tableau workbook logic exactly)
+# Gift Card Incentive tier classification — matches Tableau calculated field
+# Calculation_6730700046477824000 exactly.
 # ---------------------------------------------------------------------------
 GC_TIER_SQL = """
 CASE
-  WHEN CONTAINS(ad_group_name, '$50')
-       OR ad_group_id IN ('301700166','307068346','307092336','307100326',
+  WHEN CONTAINS(AD_GROUP_NAME, '$50')
+       OR AD_GROUP_ID IN ('301700166','307068346','307092336','307100326',
                           '307913506','307923256','391368056')
   THEN '$50'
-  WHEN CONTAINS(ad_group_name, '$75')  THEN '$75'
-  WHEN CONTAINS(ad_group_name, '$100') THEN '$100'
-  WHEN CONTAINS(ad_group_name, '$150')
-       OR CONTAINS(utm_campaign, '150') THEN '$150'
+  WHEN CONTAINS(AD_GROUP_NAME, '$75')  THEN '$75'
+  WHEN CONTAINS(AD_GROUP_NAME, '$100') THEN '$100'
+  WHEN CONTAINS(AD_GROUP_NAME, '$150')
+       OR CONTAINS(UTM_CAMPAIGN, '150') THEN '$150'
   ELSE 'Other'
 END
 """
-
-GC_FILTER_SQL = """(
-  CONTAINS(ad_group_name, '$50') OR CONTAINS(ad_group_name, '$75')
-  OR CONTAINS(ad_group_name, '$100') OR CONTAINS(ad_group_name, '$150')
-  OR CONTAINS(utm_campaign, '150')
-  OR ad_group_id IN ('301700166','307068346','307092336','307100326',
-                     '307913506','307923256','391368056')
-)"""
 
 
 def run_query(sql_text: str) -> list[dict]:
@@ -69,61 +73,78 @@ def run_query(sql_text: str) -> list[dict]:
 
 
 def fetch_monthly_by_tier(lookback_days: int) -> list[dict]:
+    """
+    All Paid Social rows, classified by GC tier.
+    No GC filter applied — 'Other' captures all non-GC paid social campaigns.
+    """
     start = (date.today() - timedelta(days=lookback_days)).isoformat()
-    # No GC filter here — ALL paid social rows included so "Other" tier is populated.
-    # "Other" = any paid social row whose ad_group_name/utm_campaign has no GC amount.
     return run_query(f"""
     SELECT
-      {GC_TIER_SQL} AS gc_tier,
-      DATE_FORMAT(DATE_TRUNC('month', attribution_stage_date), 'yyyy-MM-dd') AS month,
-      SUM(mql1_counter)                 AS mql1,
-      SUM(mql2_counter)                 AS mql2,
-      SUM(opportunity_creation_counter) AS sao,
-      SUM(closed_won_counter)           AS cw,
-      SUM(disqualified_counter)         AS dq,
-      CAST(SUM(booked_commissionable_mrr) AS DOUBLE) AS cw_mrr
-    FROM analytics_us_east_2_certified_models.semantics.view_marketing_lead_gen_to_sales_funnel_stage_attribution
-    WHERE channel_name_group = 'Paid Social'
-      AND attribution_stage_date >= '{start}'
+      {GC_TIER_SQL}                                           AS gc_tier,
+      DATE_FORMAT(DATE_TRUNC('month', `DATE`), 'yyyy-MM-dd') AS month,
+      SUM(MQL1)      AS mql1,
+      SUM(MQL2)      AS mql2,
+      SUM(MQL1_TA)   AS mql1_ta,
+      SUM(MQL2_TA)   AS mql2_ta,
+      SUM(SAL)       AS sal,
+      SUM(SAL_TA)    AS sal_ta,
+      SUM(TQL)       AS tql,
+      SUM(TQL_TA)    AS tql_ta,
+      SUM(SAO)       AS sao,
+      SUM(SAO_TA)    AS sao_ta,
+      SUM(CW)        AS cw,
+      SUM(CW_TA)     AS cw_ta,
+      CAST(SUM(CW_MRR)    AS DOUBLE) AS cw_mrr,
+      CAST(SUM(CW_MRR_TA) AS DOUBLE) AS cw_mrr_ta,
+      SUM(CL)        AS cl,
+      SUM(DQ)        AS dq
+    FROM {TABLE}
+    WHERE CHANNEL_NAME = 'Paid Social'
+      AND `DATE` >= '{start}'
     GROUP BY 1, 2
     ORDER BY 2 DESC, 1
     """)
 
 
 def fetch_ad_group_totals(lookback_days: int) -> list[dict]:
+    """
+    All Paid Social ad groups, classified by GC tier.
+    'Other' rows = non-GC paid social campaigns.
+    Only includes ad groups with at least 1 MQL1 or SAO to keep the table useful.
+    """
     start = (date.today() - timedelta(days=lookback_days)).isoformat()
     return run_query(f"""
     SELECT
-      {GC_TIER_SQL} AS gc_tier,
-      ad_group_name,
-      ad_campaign_name,
-      SUM(mql1_counter)                 AS mql1,
-      SUM(opportunity_creation_counter) AS sao,
-      SUM(closed_won_counter)           AS cw,
-      SUM(disqualified_counter)         AS dq,
-      CAST(SUM(booked_commissionable_mrr) AS DOUBLE) AS cw_mrr
-    FROM analytics_us_east_2_certified_models.semantics.view_marketing_lead_gen_to_sales_funnel_stage_attribution
-    WHERE channel_name_group = 'Paid Social'
-      AND {GC_FILTER_SQL}
-      AND attribution_stage_date >= '{start}'
+      {GC_TIER_SQL}  AS gc_tier,
+      AD_GROUP_NAME  AS ad_group_name,
+      AD_CAMPAIGN_NAME AS ad_campaign_name,
+      SUM(MQL1)      AS mql1,
+      SUM(SAO)       AS sao,
+      SUM(CW)        AS cw,
+      SUM(DQ)        AS dq,
+      CAST(SUM(CW_MRR) AS DOUBLE) AS cw_mrr
+    FROM {TABLE}
+    WHERE CHANNEL_NAME = 'Paid Social'
+      AND `DATE` >= '{start}'
     GROUP BY 1, 2, 3
-    ORDER BY 1, SUM(mql1_counter) DESC
+    HAVING SUM(MQL1) > 0 OR SUM(SAO) > 0
+    ORDER BY 1, SUM(MQL1) DESC
     """)
 
 
 def main():
     ts = datetime.utcnow().isoformat()
-    print(f"[{ts}] Fetching monthly-by-tier ({LOOKBACK_DAYS} days)...")
+    print(f"[{ts}] Fetching monthly-by-tier ({LOOKBACK_DAYS} days)…")
     monthly = fetch_monthly_by_tier(LOOKBACK_DAYS)
     print(f"  → {len(monthly)} rows")
 
-    print(f"[{ts}] Fetching ad-group totals...")
+    print(f"[{ts}] Fetching ad-group totals…")
     ad_groups = fetch_ad_group_totals(LOOKBACK_DAYS)
     print(f"  → {len(ad_groups)} rows")
 
     output = {
         "generated_at": datetime.utcnow().strftime("%Y-%m-%dT%H:%M:%SZ"),
-        "monthly": monthly,
+        "monthly":   monthly,
         "ad_groups": ad_groups,
     }
 
