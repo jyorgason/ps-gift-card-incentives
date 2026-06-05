@@ -85,24 +85,17 @@ input[type=date]:focus, select:focus { border-color:var(--brand);
   font-size:16px; flex-shrink:0; }
 .theme-toggle:hover { border-color:var(--brand); background:var(--brand-bg); }
 
-/* ── TIER PILLS ── */
-.tier-pills { padding:var(--sp-12) var(--sp-20); background:var(--surface-card);
-  border-bottom:1px solid var(--border-weak);
-  display:flex; align-items:center; gap:var(--sp-8); flex-wrap:wrap; }
-.tier-pill { padding:4px 14px; font-size:12px; font-weight:600;
-  border-radius:var(--r-full); border:2px solid transparent;
-  cursor:pointer; transition:all .15s; user-select:none; opacity:.4; }
-.tier-pill.active { opacity:1; }
-.pill-other { background:#fde8e8; color:var(--c-other); border-color:var(--c-other); }
-.pill-50    { background:#ddeaf6; color:var(--c-50);    border-color:var(--c-50); }
-.pill-75    { background:#e0f2f0; color:var(--c-75);    border-color:var(--c-75); }
-.pill-100   { background:#fef0e0; color:var(--c-100);   border-color:var(--c-100); }
-.pill-150   { background:#e3f4e0; color:var(--c-150);   border-color:var(--c-150); }
-[data-theme="dark"] .pill-other { background:#3d1616; }
-[data-theme="dark"] .pill-50    { background:#162030; }
-[data-theme="dark"] .pill-75    { background:#162425; }
-[data-theme="dark"] .pill-100   { background:#2e1e08; }
-[data-theme="dark"] .pill-150   { background:#162012; }
+/* ── SOLO TIER BANNER ── */
+.solo-banner {
+  display:none; align-items:center; gap:8px; flex-wrap:wrap;
+  padding:6px var(--sp-20); background:var(--surface-brand);
+  border-bottom:1px solid var(--brand); font-size:12px; color:var(--brand); font-weight:600;
+}
+.solo-banner.visible { display:flex; }
+.solo-clear { margin-left:auto; font-size:11px; font-weight:600; color:var(--brand);
+  cursor:pointer; text-decoration:underline; background:none; border:none; padding:0; }
+.solo-clear:hover { color:var(--brand-d); }
+.legend-hint { text-align:center; font-size:11px; color:var(--text-xx-weak); margin-top:4px; }
 
 /* ── CONTENT ── */
 .content { max-width:1600px; margin:0 auto; padding:var(--sp-24) var(--sp-20); }
@@ -249,15 +242,10 @@ td.rate { text-align:right; color:var(--text-x-weak); font-size:12px;
   <button class="theme-toggle" id="themeBtn" title="Toggle dark mode">🌙</button>
 </header>
 
-<!-- TIER PILLS -->
-<div class="tier-pills">
-  <span class="fl" style="margin-right:4px">Tiers:</span>
-  <!-- Tableau sort order: $50, $75, $100, $150, Other -->
-  <span class="tier-pill pill-50   active" data-tier="$50"   onclick="toggleTier(this)">$50</span>
-  <span class="tier-pill pill-75   active" data-tier="$75"   onclick="toggleTier(this)">$75</span>
-  <span class="tier-pill pill-100  active" data-tier="$100"  onclick="toggleTier(this)">$100</span>
-  <span class="tier-pill pill-150  active" data-tier="$150"  onclick="toggleTier(this)">$150</span>
-  <span class="tier-pill pill-other active" data-tier="Other" onclick="toggleTier(this)">Other</span>
+<!-- SOLO TIER BANNER — shown when a legend tier is isolated -->
+<div class="solo-banner" id="soloBanner">
+  <span id="soloLabel"></span>
+  <button class="solo-clear" onclick="clearSolo()">Show all tiers</button>
 </div>
 
 <!-- VIZ-IN-TOOLTIP (positioned by JS) -->
@@ -307,6 +295,7 @@ td.rate { text-align:right; color:var(--text-x-weak); font-size:12px;
     <div style="position:relative;height:300px">
       <canvas id="stackedBar"></canvas>
     </div>
+    <p class="legend-hint">Click a tier in the legend to isolate · click again to show all</p>
   </div>
 
   <!-- AD GROUP TABLE -->
@@ -345,14 +334,14 @@ td.rate { text-align:right; color:var(--text-x-weak); font-size:12px;
 
 <script>
 /* ── STATE ── */
-let ALL_DATA = null;
-let sortCol  = 'mql1';
-let sortDir  = 'desc';
-let activeTiers = new Set(['$50','$75','$100','$150','Other']);
+let ALL_DATA  = null;
+let sortCol   = 'mql1';
+let sortDir   = 'desc';
+let soloTier  = null;   // null = all tiers; string = isolated tier
 let lineChart, stackedBarChart;
-let AG_LOOKUP  = {};   // tier|month → sorted ad group rows
-let lineMonths = [];   // ISO month strings for line chart (parallel to x-labels)
-let barMonths  = [];   // ISO month strings for stacked bar chart
+let AG_LOOKUP  = {};
+let lineMonths = [];
+let barMonths  = [];
 
 /* Tableau sort order */
 const TIER_ORDER = ['$50','$75','$100','$150','Other'];
@@ -498,11 +487,15 @@ function inRange(monthStr, start, end) {
   return m >= start && m <= end;
 }
 
+function tierVisible(tier) {
+  return soloTier === null || soloTier === tier;
+}
+
 function filteredMonthly() {
   if (!ALL_DATA) return [];
   const { start, end } = getDateRange();
   return ALL_DATA.monthly.filter(r =>
-    activeTiers.has(r.gc_tier) && inRange(r.month, start, end)
+    tierVisible(r.gc_tier) && inRange(r.month, start, end)
   );
 }
 
@@ -541,7 +534,7 @@ function renderKPICards() {
   let html = '';
 
   TIER_ORDER.forEach(tier => {
-    if (!activeTiers.has(tier)) return;
+    if (!tierVisible(tier)) return;
     const d = totals[tier];
     const mqlSaoRate = d.mql1 > 0 ? d.sao / d.mql1 : null;
     const saoCwRate  = d.sao  > 0 ? d.cw  / d.sao  : null;
@@ -599,7 +592,7 @@ function renderLineChart() {
       byTier[r.gc_tier][m] = (byTier[r.gc_tier][m]||0) + (+r[metric]||0);
   });
 
-  const datasets = TIER_ORDER.filter(t => activeTiers.has(t)).map(t => ({
+  const datasets = TIER_ORDER.map(t => ({
     label: t,
     data:  months.map(m => byTier[t][m]||0),
     borderColor:     TIER_COLORS[t],
@@ -609,13 +602,14 @@ function renderLineChart() {
     pointHoverRadius: 7,
     tension: 0.3,
     fill: false,
+    hidden: soloTier !== null && t !== soloTier,
     datalabels: {
       color: TIER_COLORS[t],
       font: { size:10, weight:'700' },
       anchor: 'end',
       align: 'top',
       offset: 2,
-      display: 'auto', /* cull when overlapping — matches Tableau mark-labels-cull */
+      display: 'auto',
       formatter: v => v === 0 ? null : (isMoney ? fmtMoney(v) : fmt(v)),
     }
   }));
@@ -645,7 +639,8 @@ function renderLineChart() {
       layout: { padding: { top: 24 } },
       interaction: { mode:'nearest', intersect:true },
       plugins: {
-        legend: { position:'bottom', labels:{ boxWidth:12, padding:16, font:{size:12} } },
+        legend: { position:'bottom', labels:{ boxWidth:12, padding:16, font:{size:12} },
+          onClick: legendClick },
         tooltip: {
           enabled: false,
           external: ctx => externalVizTooltip(ctx, lineMonths),
@@ -681,12 +676,13 @@ function renderStackedBar() {
       byTier[r.gc_tier][m] = (byTier[r.gc_tier][m]||0) + (+r[metric]||0);
   });
 
-  const datasets = TIER_ORDER.filter(t => activeTiers.has(t)).map(t => ({
+  const datasets = TIER_ORDER.map(t => ({
     label: t,
     data:  months.map(m => byTier[t][m]||0),
     backgroundColor: TIER_COLORS[t]+'cc',
     borderColor:     TIER_COLORS[t],
     borderWidth: 1,
+    hidden: soloTier !== null && t !== soloTier,
   }));
 
   const xlabels = months.map(m => {
@@ -739,7 +735,8 @@ function renderStackedBar() {
       responsive: true, maintainAspectRatio: false,
       layout: { padding: { top: 20 } }, // room for total labels above bars
       plugins: {
-        legend: { position:'bottom', labels:{ boxWidth:12, padding:12, font:{size:11} } },
+        legend: { position:'bottom', labels:{ boxWidth:12, padding:12, font:{size:11} },
+          onClick: legendClick },
         tooltip: {
           enabled: false,
           external: ctx => externalVizTooltip(ctx, barMonths),
@@ -772,7 +769,7 @@ function renderTable() {
   if (!ALL_DATA) return;
   const query = (document.getElementById('tableSearch').value||'').toLowerCase();
   let rows = ALL_DATA.ad_groups
-    .filter(r => activeTiers.has(r.gc_tier))
+    .filter(r => tierVisible(r.gc_tier))
     .filter(r => !query ||
       r.ad_group_name.toLowerCase().includes(query) ||
       r.ad_campaign_name.toLowerCase().includes(query));
@@ -827,24 +824,41 @@ function applyFilters() {
   if (stackedBarChart) { stackedBarChart.destroy(); stackedBarChart = null; }
   render();
 }
+
 function resetFilters() {
   document.getElementById('startDate').value = '2025-01-01';
   document.getElementById('endDate').value   = new Date().toISOString().slice(0,10);
   document.getElementById('metricSel').value = 'sao';
-  activeTiers = new Set(TIER_ORDER);
-  document.querySelectorAll('.tier-pill').forEach(p => p.classList.add('active'));
+  soloTier = null;
+  updateSoloBanner();
   applyFilters();
 }
+
 document.getElementById('metricSel').addEventListener('change', applyFilters);
-function toggleTier(el) {
-  const tier = el.dataset.tier;
-  if (activeTiers.has(tier)) {
-    if (activeTiers.size <= 1) return;
-    activeTiers.delete(tier); el.classList.remove('active');
-  } else {
-    activeTiers.add(tier); el.classList.add('active');
-  }
+
+/* Legend click: solo a tier (click again to revert) */
+function legendClick(e, legendItem) {
+  const tier = legendItem.text;
+  soloTier = soloTier === tier ? null : tier;
+  updateSoloBanner();
   applyFilters();
+}
+
+function clearSolo() {
+  soloTier = null;
+  updateSoloBanner();
+  applyFilters();
+}
+
+function updateSoloBanner() {
+  const banner = document.getElementById('soloBanner');
+  const label  = document.getElementById('soloLabel');
+  if (soloTier) {
+    label.textContent = `Showing only: ${soloTier}`;
+    banner.classList.add('visible');
+  } else {
+    banner.classList.remove('visible');
+  }
 }
 
 /* ── DARK MODE ── */
