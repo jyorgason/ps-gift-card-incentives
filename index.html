@@ -353,17 +353,16 @@ async function loadData() {
 
 /* ── HELPERS ── */
 function getDateRange() {
-  const s = document.getElementById('startDate').value;
-  const e = document.getElementById('endDate').value;
-  return {
-    start: s ? new Date(s+'T00:00:00') : new Date('2020-01-01'),
-    end:   e ? new Date(e+'T23:59:59') : new Date()
-  };
+  const s = document.getElementById('startDate').value || '2020-01-01';
+  const e = document.getElementById('endDate').value || new Date().toISOString().slice(0,10);
+  // Return YYYY-MM strings for timezone-safe string comparison
+  return { start: s.slice(0,7), end: e.slice(0,7) };
 }
 
 function inRange(monthStr, start, end) {
-  const d = new Date(monthStr);
-  return d >= start && d <= end;
+  // ISO string comparison works correctly: "2026-01" >= "2025-01"
+  const m = monthStr.slice(0,7);
+  return m >= start && m <= end;
 }
 
 function filteredMonthly() {
@@ -488,8 +487,9 @@ function renderLineChart() {
   }));
 
   const xlabels = months.map(m => {
-    const d = new Date(m+'-01');
-    return d.toLocaleDateString('en-US',{month:'short',year:'2-digit'});
+    const [y, mo] = m.split('-');
+    const MON = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+    return MON[+mo-1] + " '" + y.slice(2);
   });
 
   /* Tooltip matching Tableau format: "Gift Card Incentive / Month / Metric" */
@@ -566,8 +566,9 @@ function renderStackedBar() {
   }));
 
   const xlabels = months.map(m => {
-    const d = new Date(m+'-01');
-    return d.toLocaleDateString('en-US',{month:'short',year:'2-digit'});
+    const [y, mo] = m.split('-');
+    const MON = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+    return MON[+mo-1] + " '" + y.slice(2);
   });
 
   /* Tableau tooltip format */
