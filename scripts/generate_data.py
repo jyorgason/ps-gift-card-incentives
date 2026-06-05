@@ -107,84 +107,121 @@ def fetch_monthly_by_tier(lookback_days: int) -> list[dict]:
     """)
 
 
-def fetch_ad_group_totals(lookback_days: int) -> list[dict]:
+def fetch_monthly_granular(lookback_days: int) -> list[dict]:
     """
-    All Paid Social ad groups, classified by GC tier.
-    'Other' rows = non-GC paid social campaigns.
-    Only includes ad groups with at least 1 MQL1 or SAO to keep the table useful.
+    Granular monthly dataset: all filterable dimensions included.
+    Powers client-side filtering for all 7 Tableau quick filters.
+    Replaces the simple monthly-by-tier query.
     """
     start = (date.today() - timedelta(days=lookback_days)).isoformat()
     return run_query(f"""
     SELECT
-      {GC_TIER_SQL}  AS gc_tier,
-      AD_GROUP_NAME  AS ad_group_name,
+      {GC_TIER_SQL}                                           AS gc_tier,
+      DATE_FORMAT(DATE_TRUNC('month', `DATE`), 'yyyy-MM-dd') AS month,
+      COALESCE(SUBCHANNEL_NAME, 'Unknown')                   AS subchannel_name,
+      COALESCE(SEGMENT, 'Unknown')                           AS segment,
+      COALESCE(SUBSEGMENT, 'Unknown')                        AS subsegment,
+      COALESCE(ACCOUNT_INDUSTRY, 'Unknown')                  AS account_industry,
+      COALESCE(AD_CAMPAIGN_NAME, 'Not Available')            AS ad_campaign_name,
+      COALESCE(AD_GROUP_NAME, 'Not Available')               AS ad_group_name,
+      SUM(MQL1)                     AS mql1,
+      SUM(MQL2)                     AS mql2,
+      SUM(MQL1_TA)                  AS mql1_ta,
+      SUM(MQL2_TA)                  AS mql2_ta,
+      SUM(SAL)                      AS sal,
+      SUM(SAL_TA)                   AS sal_ta,
+      SUM(TQL)                      AS tql,
+      SUM(TQL_TA)                   AS tql_ta,
+      SUM(SAO)                      AS sao,
+      SUM(SAO_TA)                   AS sao_ta,
+      SUM(CW)                       AS cw,
+      SUM(CW_TA)                    AS cw_ta,
+      CAST(SUM(CW_MRR)    AS DOUBLE) AS cw_mrr,
+      CAST(SUM(CW_MRR_TA) AS DOUBLE) AS cw_mrr_ta,
+      SUM(CL)                       AS cl,
+      SUM(DQ)                       AS dq
+    FROM {TABLE}
+    WHERE CHANNEL_NAME = 'Paid Social'
+      AND ATTRIBUTION_MODEL = 'First 90 Days'
+      AND `DATE` >= '{start}'
+    GROUP BY 1, 2, 3, 4, 5, 6, 7, 8
+    ORDER BY 2 DESC, 1, 9 DESC
+    """)
+
+
+def fetch_ad_group_totals(lookback_days: int) -> list[dict]:
+    """
+    All Paid Social ad groups with AD_ID for table-level filtering.
+    'Other' rows = non-GC paid social campaigns.
+    """
+    start = (date.today() - timedelta(days=lookback_days)).isoformat()
+    return run_query(f"""
+    SELECT
+      {GC_TIER_SQL}    AS gc_tier,
+      AD_GROUP_NAME    AS ad_group_name,
       AD_CAMPAIGN_NAME AS ad_campaign_name,
-      SUM(MQL1)      AS mql1,
-      SUM(SAO)       AS sao,
-      SUM(CW)        AS cw,
-      SUM(DQ)        AS dq,
+      AD_ID            AS ad_id,
+      SUM(MQL1)        AS mql1,
+      SUM(SAO)         AS sao,
+      SUM(CW)          AS cw,
+      SUM(DQ)          AS dq,
       CAST(SUM(CW_MRR) AS DOUBLE) AS cw_mrr
     FROM {TABLE}
     WHERE CHANNEL_NAME = 'Paid Social'
       AND ATTRIBUTION_MODEL = 'First 90 Days'
       AND `DATE` >= '{start}'
-    GROUP BY 1, 2, 3
-    ORDER BY 1, 4 DESC
+    GROUP BY 1, 2, 3, 4
+    ORDER BY 1, 5 DESC
     """)
 
 
-def fetch_monthly_adgroups(lookback_days: int) -> list[dict]:
+
+
+def encode_granular(rows: list[dict]) -> dict:
     """
-    Tier × month × ad_group breakdown — powers the VizInTooltip bar chart.
-    Only the metrics needed for tooltip display; limited to last 13 months
-    to keep JSON size manageable.
+    Dictionary-encode monthly_granular to reduce JSON size.
+    Repeated string values are replaced with integer indices into lookup arrays.
+    Result: ~2-3 MB instead of ~16 MB raw.
     """
-    start = (date.today() - timedelta(days=lookback_days)).isoformat()  # match main lookback
-    return run_query(f"""
-    SELECT
-      {GC_TIER_SQL}                                           AS gc_tier,
-      DATE_FORMAT(DATE_TRUNC('month', `DATE`), 'yyyy-MM-dd') AS month,
-      AD_GROUP_NAME                                           AS ad_group_name,
-      SUM(MQL1)                    AS mql1,
-      SUM(SAO)                     AS sao,
-      SUM(CW)                      AS cw,
-      CAST(SUM(CW_MRR) AS DOUBLE)  AS cw_mrr,
-      SUM(MQL1_TA)                 AS mql1_ta,
-      SUM(SAO_TA)                  AS sao_ta,
-      SUM(CW_TA)                   AS cw_ta,
-      CAST(SUM(CW_MRR_TA) AS DOUBLE) AS cw_mrr_ta,
-      SUM(SAL)                     AS sal,
-      SUM(TQL)                     AS tql,
-      SUM(CL)                      AS cl,
-      SUM(DQ)                      AS dq
-    FROM {TABLE}
-    WHERE CHANNEL_NAME = 'Paid Social'
-      AND ATTRIBUTION_MODEL = 'First 90 Days'
-      AND `DATE` >= '{start}'
-    GROUP BY 1, 2, 3
-    ORDER BY 2 DESC, 1, 4 DESC
-    """)
+    str_fields = ['gc_tier', 'month', 'subchannel_name', 'segment', 'subsegment',
+                  'account_industry', 'ad_campaign_name', 'ad_group_name']
+    num_fields = ['mql1', 'mql2', 'mql1_ta', 'mql2_ta', 'sal', 'sal_ta', 'tql', 'tql_ta',
+                  'sao', 'sao_ta', 'cw', 'cw_ta', 'cw_mrr', 'cw_mrr_ta', 'cl', 'dq']
+
+    dicts = {f: sorted(set(str(r.get(f) or '') for r in rows)) for f in str_fields}
+    enc   = {f: {v: i for i, v in enumerate(dicts[f])} for f in str_fields}
+
+    encoded = [
+        [enc[f][str(r.get(f) or '')] for f in str_fields] +
+        [float(r.get(f) or 0) for f in num_fields]
+        for r in rows
+    ]
+
+    return {
+        'schema': str_fields + num_fields,
+        'dicts':  dicts,
+        'rows':   encoded,
+    }
 
 
 def main():
     ts = datetime.utcnow().isoformat()
-    print(f"[{ts}] Fetching monthly-by-tier ({LOOKBACK_DAYS} days)…")
-    monthly = fetch_monthly_by_tier(LOOKBACK_DAYS)
-    print(f"  → {len(monthly)} rows")
+
+    print(f"[{ts}] Fetching monthly granular ({LOOKBACK_DAYS} days)…")
+    monthly_granular_raw = fetch_monthly_granular(LOOKBACK_DAYS)
+    print(f"  → {len(monthly_granular_raw)} rows — encoding…")
+    monthly_granular = encode_granular(monthly_granular_raw)
 
     print(f"[{ts}] Fetching ad-group totals…")
     ad_groups = fetch_ad_group_totals(LOOKBACK_DAYS)
     print(f"  → {len(ad_groups)} rows")
 
-    print(f"[{ts}] Fetching monthly ad-group breakdown (for tooltip)…")
-    monthly_adgroups = fetch_monthly_adgroups(LOOKBACK_DAYS)
-    print(f"  → {len(monthly_adgroups)} rows")
+    # monthly_adgroups derived from monthly_granular in the frontend — no separate query needed
 
     output = {
         "generated_at":    datetime.utcnow().strftime("%Y-%m-%dT%H:%M:%SZ"),
-        "monthly":         monthly,
-        "ad_groups":       ad_groups,
-        "monthly_adgroups": monthly_adgroups,
+        "monthly_granular": monthly_granular,
+        "ad_groups":        ad_groups,
     }
 
     os.makedirs(os.path.dirname(OUTPUT_FILE), exist_ok=True)

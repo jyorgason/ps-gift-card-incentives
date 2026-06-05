@@ -97,6 +97,84 @@ input[type=date]:focus, select:focus { border-color:var(--brand);
 .solo-clear:hover { color:var(--brand-d); }
 .legend-hint { text-align:center; font-size:11px; color:var(--text-xx-weak); margin-top:4px; }
 
+/* ── FILTER BAR ── */
+.filter-bar {
+  background:var(--surface-card); border-bottom:1px solid var(--border-weak);
+  padding:8px var(--sp-20); display:flex; align-items:center; gap:var(--sp-8);
+  flex-wrap:wrap;
+}
+.filter-bar-label { font-size:11px; font-weight:600; color:var(--text-x-weak);
+  text-transform:uppercase; letter-spacing:.06em; white-space:nowrap; flex-shrink:0; }
+.filter-clear-all { margin-left:auto; font-size:11px; font-weight:600; color:var(--negative);
+  cursor:pointer; background:none; border:none; padding:2px 6px;
+  border-radius:var(--r-xs); white-space:nowrap; }
+.filter-clear-all:hover { background:var(--negative-bg); }
+.active-chips { display:flex; gap:4px; flex-wrap:wrap; align-items:center; }
+.active-chip {
+  display:inline-flex; align-items:center; gap:4px; padding:2px 8px 2px 10px;
+  background:var(--surface-raised); border:1px solid var(--border-default);
+  border-radius:var(--r-full); font-size:11px; color:var(--text-medium); white-space:nowrap;
+}
+.active-chip button {
+  background:none; border:none; cursor:pointer; color:var(--text-x-weak);
+  font-size:13px; line-height:1; padding:0; margin-left:2px;
+}
+.active-chip button:hover { color:var(--negative); }
+
+/* ── MULTI-SELECT FILTER ── */
+.mf-wrap { position:relative; }
+.mf-btn {
+  display:flex; align-items:center; gap:4px; padding:4px 10px;
+  font-family:var(--font-body); font-size:12px; font-weight:500;
+  color:var(--text-medium); background:var(--surface-raised);
+  border:1px solid var(--border-default); border-radius:var(--r-full);
+  cursor:pointer; white-space:nowrap; transition:border-color .15s;
+}
+.mf-btn:hover, .mf-btn.open { border-color:var(--brand); color:var(--text-strong); }
+.mf-btn.has-selection { background:var(--brand-bg); border-color:var(--brand);
+  color:var(--brand); font-weight:600; }
+.mf-count { background:var(--brand); color:#fff; border-radius:var(--r-full);
+  font-size:10px; font-weight:700; padding:0 5px; min-width:16px; text-align:center; }
+.mf-arrow { font-size:10px; opacity:.5; }
+.mf-panel {
+  display:none; position:absolute; top:calc(100% + 4px); left:0; z-index:500;
+  background:var(--surface-card); border:1px solid var(--border-default);
+  border-radius:var(--r-md); box-shadow:var(--shadow-float);
+  min-width:220px; max-width:320px;
+}
+.mf-panel.open { display:block; }
+.mf-search { padding:8px 8px 4px; }
+.mf-search input {
+  width:100%; font-family:var(--font-body); font-size:12px;
+  padding:5px 9px; border:1px solid var(--border-default);
+  border-radius:var(--r-full); background:var(--surface-raised);
+  color:var(--text-strong); outline:none;
+}
+.mf-search input:focus { border-color:var(--brand); }
+.mf-options {
+  max-height:200px; overflow-y:auto; padding:4px 0;
+}
+.mf-option {
+  display:flex; align-items:center; gap:8px; padding:5px 12px;
+  cursor:pointer; font-size:12px; color:var(--text-medium);
+  white-space:nowrap; overflow:hidden; text-overflow:ellipsis;
+}
+.mf-option:hover { background:var(--surface-hover); }
+.mf-option input[type=checkbox] { flex-shrink:0; accent-color:var(--brand); }
+.mf-option span { overflow:hidden; text-overflow:ellipsis; }
+.mf-footer {
+  padding:6px 8px; border-top:1px solid var(--border-weak);
+  display:flex; gap:6px; justify-content:flex-end;
+}
+.mf-footer button {
+  font-family:var(--font-body); font-size:11px; font-weight:600;
+  padding:3px 10px; border-radius:var(--r-full); cursor:pointer; border:none;
+}
+.mf-footer .mf-select-all { background:var(--surface-raised); color:var(--text-medium); }
+.mf-footer .mf-clear { background:var(--surface-raised); color:var(--text-medium); }
+.mf-footer .mf-apply { background:var(--brand); color:#fff; }
+.mf-empty { padding:12px; text-align:center; color:var(--text-xx-weak); font-size:12px; }
+
 /* ── CONTENT ── */
 .content { max-width:1600px; margin:0 auto; padding:var(--sp-24) var(--sp-20); }
 .section-title { font-family:var(--font-heading); font-size:15px; font-weight:700;
@@ -248,6 +326,104 @@ td.rate { text-align:right; color:var(--text-x-weak); font-size:12px;
   <button class="solo-clear" onclick="clearSolo()">Show all tiers</button>
 </div>
 
+<!-- DIMENSION FILTER BAR -->
+<div class="filter-bar" id="filterBar">
+  <span class="filter-bar-label">Filters:</span>
+  <div class="mf-wrap" id="mf-subchannel_name">
+    <button class="mf-btn" onclick="toggleMf(this)">
+      <span>Subchannel</span><span class="mf-count" style="display:none"></span><span class="mf-arrow">▾</span>
+    </button>
+    <div class="mf-panel"><div class="mf-options"></div>
+      <div class="mf-footer">
+        <button class="mf-select-all" onclick="mfSelectAll(this)">All</button>
+        <button class="mf-clear" onclick="mfClear(this)">Clear</button>
+        <button class="mf-apply" onclick="mfApply(this)">Apply</button>
+      </div>
+    </div>
+  </div>
+  <div class="mf-wrap" id="mf-segment">
+    <button class="mf-btn" onclick="toggleMf(this)">
+      <span>Segment</span><span class="mf-count" style="display:none"></span><span class="mf-arrow">▾</span>
+    </button>
+    <div class="mf-panel"><div class="mf-options"></div>
+      <div class="mf-footer">
+        <button class="mf-select-all" onclick="mfSelectAll(this)">All</button>
+        <button class="mf-clear" onclick="mfClear(this)">Clear</button>
+        <button class="mf-apply" onclick="mfApply(this)">Apply</button>
+      </div>
+    </div>
+  </div>
+  <div class="mf-wrap" id="mf-subsegment">
+    <button class="mf-btn" onclick="toggleMf(this)">
+      <span>Sub Segment</span><span class="mf-count" style="display:none"></span><span class="mf-arrow">▾</span>
+    </button>
+    <div class="mf-panel"><div class="mf-options"></div>
+      <div class="mf-footer">
+        <button class="mf-select-all" onclick="mfSelectAll(this)">All</button>
+        <button class="mf-clear" onclick="mfClear(this)">Clear</button>
+        <button class="mf-apply" onclick="mfApply(this)">Apply</button>
+      </div>
+    </div>
+  </div>
+  <div class="mf-wrap" id="mf-account_industry">
+    <button class="mf-btn" onclick="toggleMf(this)">
+      <span>Industry</span><span class="mf-count" style="display:none"></span><span class="mf-arrow">▾</span>
+    </button>
+    <div class="mf-panel">
+      <div class="mf-search"><input type="text" placeholder="Search industries…" oninput="mfSearch(this)"></div>
+      <div class="mf-options"></div>
+      <div class="mf-footer">
+        <button class="mf-select-all" onclick="mfSelectAll(this)">All</button>
+        <button class="mf-clear" onclick="mfClear(this)">Clear</button>
+        <button class="mf-apply" onclick="mfApply(this)">Apply</button>
+      </div>
+    </div>
+  </div>
+  <div class="mf-wrap" id="mf-ad_campaign_name">
+    <button class="mf-btn" onclick="toggleMf(this)">
+      <span>Campaign</span><span class="mf-count" style="display:none"></span><span class="mf-arrow">▾</span>
+    </button>
+    <div class="mf-panel">
+      <div class="mf-search"><input type="text" placeholder="Search campaigns…" oninput="mfSearch(this)"></div>
+      <div class="mf-options"></div>
+      <div class="mf-footer">
+        <button class="mf-select-all" onclick="mfSelectAll(this)">All</button>
+        <button class="mf-clear" onclick="mfClear(this)">Clear</button>
+        <button class="mf-apply" onclick="mfApply(this)">Apply</button>
+      </div>
+    </div>
+  </div>
+  <div class="mf-wrap" id="mf-ad_group_name">
+    <button class="mf-btn" onclick="toggleMf(this)">
+      <span>Ad Group</span><span class="mf-count" style="display:none"></span><span class="mf-arrow">▾</span>
+    </button>
+    <div class="mf-panel">
+      <div class="mf-search"><input type="text" placeholder="Search ad groups…" oninput="mfSearch(this)"></div>
+      <div class="mf-options"></div>
+      <div class="mf-footer">
+        <button class="mf-select-all" onclick="mfSelectAll(this)">All</button>
+        <button class="mf-clear" onclick="mfClear(this)">Clear</button>
+        <button class="mf-apply" onclick="mfApply(this)">Apply</button>
+      </div>
+    </div>
+  </div>
+  <div class="mf-wrap" id="mf-ad_id">
+    <button class="mf-btn" onclick="toggleMf(this)">
+      <span>Ad ID</span><span class="mf-count" style="display:none"></span><span class="mf-arrow">▾</span>
+    </button>
+    <div class="mf-panel">
+      <div class="mf-search"><input type="text" placeholder="Search ad IDs…" oninput="mfSearch(this)"></div>
+      <div class="mf-options"></div>
+      <div class="mf-footer">
+        <button class="mf-select-all" onclick="mfSelectAll(this)">All</button>
+        <button class="mf-clear" onclick="mfClear(this)">Clear</button>
+        <button class="mf-apply" onclick="mfApply(this)">Apply</button>
+      </div>
+    </div>
+  </div>
+  <button class="filter-clear-all" id="filterClearAll" style="display:none" onclick="clearAllFilters()">✕ Clear all filters</button>
+</div>
+
 <!-- VIZ-IN-TOOLTIP (positioned by JS) -->
 <div id="vizTooltip"></div>
 
@@ -343,6 +519,22 @@ let AG_LOOKUP  = {};
 let lineMonths = [];
 let barMonths  = [];
 
+/* Dimension filters — key = field name in monthly_granular, value = Set of selected values or null (all) */
+const DIM_FILTERS = {
+  subchannel_name:  null,
+  segment:          null,
+  subsegment:       null,
+  account_industry: null,
+  ad_campaign_name: null,
+  ad_group_name:    null,
+  ad_id:            null,  // applies to ad_groups table only
+};
+
+/* Fields that live in monthly_granular (for chart/KPI filtering) */
+const GRANULAR_DIMS = ['subchannel_name','segment','subsegment','account_industry','ad_campaign_name','ad_group_name'];
+/* Fields that apply only to ad_groups table */
+const TABLE_ONLY_DIMS = ['ad_id'];
+
 /* Tableau sort order */
 const TIER_ORDER = ['$50','$75','$100','$150','Other'];
 const TIER_COLORS = { '$50':'#4e79a8', '$75':'#78b7b2', '$100':'#f18f1c', '$150':'#59a14f', 'Other':'#df5857' };
@@ -356,14 +548,37 @@ const METRIC_LABELS = {
 };
 const MONEY_METRICS = new Set(['cw_mrr','cw_mrr_ta']);
 
-/* ── AD GROUP LOOKUP ── */
+/* ── DECODE COMPACT GRANULAR FORMAT ── */
+function decodeGranular(enc) {
+  if (!enc || !enc.schema) return [];
+  const { schema, dicts, rows } = enc;
+  const strSet = new Set(Object.keys(dicts));
+  return rows.map(row =>
+    Object.fromEntries(schema.map((f, i) => [f, strSet.has(f) ? dicts[f][row[i]] : row[i]]))
+  );
+}
+
+/* ── AD GROUP LOOKUP (derived from monthly_granular) ── */
 function buildAdGroupLookup() {
   AG_LOOKUP = {};
-  if (!ALL_DATA || !ALL_DATA.monthly_adgroups) return;
-  ALL_DATA.monthly_adgroups.forEach(r => {
+  if (!ALL_DATA || !ALL_DATA.monthly_granular) return;
+  // Aggregate monthly_granular by tier|month|ad_group_name for tooltip
+  const agg = {};
+  ALL_DATA.monthly_granular.forEach(r => {
     const key = r.gc_tier + '|' + r.month.slice(0,7);
+    const agKey = key + '|' + r.ad_group_name;
+    if (!agg[agKey]) {
+      agg[agKey] = { gc_tier: r.gc_tier, month: r.month, ad_group_name: r.ad_group_name,
+        mql1:0, mql2:0, mql1_ta:0, sao:0, sao_ta:0, cw:0, cw_ta:0, cw_mrr:0, cw_mrr_ta:0, sal:0, tql:0, cl:0, dq:0 };
+    }
+    const a = agg[agKey];
+    ['mql1','mql2','mql1_ta','sao','sao_ta','cw','cw_ta','cw_mrr','cw_mrr_ta','sal','tql','cl','dq']
+      .forEach(k => { a[k] += (+r[k]||0); });
+  });
+  Object.values(agg).forEach(a => {
+    const key = a.gc_tier + '|' + a.month.slice(0,7);
     if (!AG_LOOKUP[key]) AG_LOOKUP[key] = [];
-    AG_LOOKUP[key].push(r);
+    AG_LOOKUP[key].push(a);
   });
 }
 
@@ -389,9 +604,9 @@ function externalVizTooltip(context, monthsArr) {
   // Use the same date range the report is filtered to
   const { start: rangeStart, end: rangeEnd } = getDateRange();
 
-  // Aggregate monthly_adgroups for this tier across the full filtered date range
+  // Aggregate monthly_granular for this tier across the full filtered date range
   const aggr = {};
-  (ALL_DATA.monthly_adgroups || [])
+  (ALL_DATA.monthly_granular || [])
     .filter(r => {
       const m = r.month.slice(0,7);
       return r.gc_tier === tier && m >= rangeStart && m <= rangeEnd;
@@ -462,10 +677,13 @@ async function loadData() {
   try {
     const r = await fetch('data/gc_data.json?_=' + Date.now());
     if (!r.ok) throw new Error('HTTP ' + r.status);
-    ALL_DATA = await r.json();
+    const raw = await r.json();
+    // Decode dictionary-encoded monthly_granular into array of objects
+    ALL_DATA = { ...raw, monthly_granular: decodeGranular(raw.monthly_granular) };
     document.getElementById('updatedAt').textContent =
       'Updated ' + new Date(ALL_DATA.generated_at).toLocaleString(undefined,
         {month:'short',day:'numeric',hour:'2-digit',minute:'2-digit'});
+    initFilters();
     render();
   } catch(e) {
     document.getElementById('tierGrid').innerHTML =
@@ -491,22 +709,38 @@ function tierVisible(tier) {
   return soloTier === null || soloTier === tier;
 }
 
+function dimFiltersActive() {
+  return GRANULAR_DIMS.some(k => DIM_FILTERS[k] !== null);
+}
+
+function anyFilterActive() {
+  return dimFiltersActive() || TABLE_ONLY_DIMS.some(k => DIM_FILTERS[k] !== null);
+}
+
+function matchesDimFilters(r) {
+  return GRANULAR_DIMS.every(k => {
+    const sel = DIM_FILTERS[k];
+    return sel === null || sel.has(r[k]);
+  });
+}
+
 function filteredMonthly() {
   if (!ALL_DATA) return [];
   const { start, end } = getDateRange();
-  return ALL_DATA.monthly.filter(r =>
-    tierVisible(r.gc_tier) && inRange(r.month, start, end)
+  const src = ALL_DATA.monthly_granular || [];
+  return src.filter(r =>
+    tierVisible(r.gc_tier) && inRange(r.month, start, end) && matchesDimFilters(r)
   );
 }
 
 function tierTotals() {
   const t = {};
-  TIER_ORDER.forEach(k => t[k] = {mql1:0,mql2:0,sal:0,tql:0,sao:0,sao_ta:0,cw:0,cw_ta:0,cw_mrr:0,cw_mrr_ta:0,cl:0});
+  const METRIC_KEYS = ['mql1','mql2','mql1_ta','mql2_ta','sal','sal_ta','tql','tql_ta',
+                       'sao','sao_ta','cw','cw_ta','cw_mrr','cw_mrr_ta','cl','dq'];
+  TIER_ORDER.forEach(k => { t[k] = {}; METRIC_KEYS.forEach(m => t[k][m] = 0); });
   filteredMonthly().forEach(r => {
     if (!t[r.gc_tier]) return;
-    ['mql1','mql2','sal','tql','sao','sao_ta','cw','cw_ta','cw_mrr','cw_mrr_ta','cl','dq'].forEach(k => {
-      t[r.gc_tier][k] = (t[r.gc_tier][k] || 0) + (+r[k] || 0);
-    });
+    METRIC_KEYS.forEach(k => { t[r.gc_tier][k] = (t[r.gc_tier][k]||0) + (+r[k]||0); });
   });
   return t;
 }
@@ -770,6 +1004,7 @@ function renderTable() {
   const query = (document.getElementById('tableSearch').value||'').toLowerCase();
   let rows = ALL_DATA.ad_groups
     .filter(r => tierVisible(r.gc_tier))
+    .filter(r => DIM_FILTERS.ad_id === null || DIM_FILTERS.ad_id.has(r.ad_id))
     .filter(r => !query ||
       r.ad_group_name.toLowerCase().includes(query) ||
       r.ad_campaign_name.toLowerCase().includes(query));
@@ -831,7 +1066,121 @@ function resetFilters() {
   document.getElementById('metricSel').value = 'sao';
   soloTier = null;
   updateSoloBanner();
+  clearAllFilters();
+}
+
+/* ── DIMENSION FILTER LOGIC ── */
+
+function initFilters() {
+  if (!ALL_DATA || !ALL_DATA.monthly_granular) return;
+  const mg = ALL_DATA.monthly_granular;
+  const ag = ALL_DATA.ad_groups || [];
+
+  // Build distinct sorted values for each dim from monthly_granular
+  const dimFields = {
+    subchannel_name:  mg,
+    segment:          mg,
+    subsegment:       mg,
+    account_industry: mg,
+    ad_campaign_name: mg,
+    ad_group_name:    mg,
+    ad_id:            ag,
+  };
+
+  Object.entries(dimFields).forEach(([field, src]) => {
+    const vals = [...new Set(src.map(r => r[field]).filter(Boolean))].sort();
+    const wrap = document.getElementById('mf-' + field);
+    if (!wrap) return;
+    const optDiv = wrap.querySelector('.mf-options');
+    optDiv.innerHTML = vals.length
+      ? vals.map(v => `<label class="mf-option">
+          <input type="checkbox" value="${v.replace(/"/g,'&quot;')}" checked>
+          <span title="${v}">${v}</span>
+        </label>`).join('')
+      : `<div class="mf-empty">No values</div>`;
+  });
+}
+
+function toggleMf(btn) {
+  const wrap  = btn.closest('.mf-wrap');
+  const panel = wrap.querySelector('.mf-panel');
+  const isOpen = panel.classList.contains('open');
+  // Close all others
+  document.querySelectorAll('.mf-panel.open').forEach(p => p.classList.remove('open'));
+  document.querySelectorAll('.mf-btn.open').forEach(b => b.classList.remove('open'));
+  if (!isOpen) { panel.classList.add('open'); btn.classList.add('open'); }
+}
+
+// Close panels when clicking outside
+document.addEventListener('click', e => {
+  if (!e.target.closest('.mf-wrap')) {
+    document.querySelectorAll('.mf-panel.open').forEach(p => p.classList.remove('open'));
+    document.querySelectorAll('.mf-btn.open').forEach(b => b.classList.remove('open'));
+  }
+});
+
+function mfSearch(input) {
+  const q = input.value.toLowerCase();
+  const options = input.closest('.mf-panel').querySelectorAll('.mf-option');
+  options.forEach(opt => {
+    opt.style.display = opt.querySelector('span').textContent.toLowerCase().includes(q) ? '' : 'none';
+  });
+}
+
+function mfSelectAll(btn) {
+  btn.closest('.mf-panel').querySelectorAll('.mf-option input').forEach(cb => cb.checked = true);
+}
+
+function mfClear(btn) {
+  btn.closest('.mf-panel').querySelectorAll('.mf-option input').forEach(cb => cb.checked = false);
+}
+
+function mfApply(btn) {
+  const wrap  = btn.closest('.mf-wrap');
+  const field = wrap.id.replace('mf-', '');
+  const cbs   = wrap.querySelectorAll('.mf-option input:checked');
+  const total = wrap.querySelectorAll('.mf-option input').length;
+  const sel   = new Set([...cbs].map(cb => cb.value));
+
+  // null = all selected (no filter); Set = specific selection
+  DIM_FILTERS[field] = sel.size === total ? null : sel;
+
+  // Update button appearance
+  const filterBtn = wrap.querySelector('.mf-btn');
+  const countEl   = filterBtn.querySelector('.mf-count');
+  if (DIM_FILTERS[field] !== null) {
+    filterBtn.classList.add('has-selection');
+    countEl.textContent = sel.size;
+    countEl.style.display = '';
+  } else {
+    filterBtn.classList.remove('has-selection');
+    countEl.style.display = 'none';
+  }
+
+  // Close panel
+  wrap.querySelector('.mf-panel').classList.remove('open');
+  filterBtn.classList.remove('open');
+
+  updateFilterClearAll();
   applyFilters();
+}
+
+function clearAllFilters() {
+  Object.keys(DIM_FILTERS).forEach(k => { DIM_FILTERS[k] = null; });
+  document.querySelectorAll('.mf-btn').forEach(btn => {
+    btn.classList.remove('has-selection');
+    const c = btn.querySelector('.mf-count');
+    if (c) c.style.display = 'none';
+  });
+  // Re-check all checkboxes
+  document.querySelectorAll('.mf-option input[type=checkbox]').forEach(cb => cb.checked = true);
+  updateFilterClearAll();
+  applyFilters();
+}
+
+function updateFilterClearAll() {
+  const anyActive = anyFilterActive();
+  document.getElementById('filterClearAll').style.display = anyActive ? '' : 'none';
 }
 
 document.getElementById('metricSel').addEventListener('change', applyFilters);
