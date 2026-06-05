@@ -127,8 +127,7 @@ def fetch_ad_group_totals(lookback_days: int) -> list[dict]:
     WHERE CHANNEL_NAME = 'Paid Social'
       AND `DATE` >= '{start}'
     GROUP BY 1, 2, 3
-    HAVING SUM(MQL1) > 0 OR SUM(SAO) > 0
-    ORDER BY 1, SUM(MQL1) DESC
+    ORDER BY 1, 4 DESC
     """)
 
 
