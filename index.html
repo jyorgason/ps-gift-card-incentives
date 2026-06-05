@@ -394,12 +394,28 @@ function externalVizTooltip(context, monthsArr) {
   const metric  = document.getElementById('metricSel').value;
   const isMoney = MONEY_METRICS.has(metric);
   const val     = isMoney ? fmtMoney(dp.raw) : fmt(dp.raw);
-  const monthISO = monthsArr[idx] || '';
   const monthLbl = dp.label;
   const color    = TIER_COLORS[tier] || '#888';
 
-  // Ad group rows for this tier+month, sorted by metric desc
-  const rows = (AG_LOOKUP[tier + '|' + monthISO] || [])
+  // Use the same date range the report is filtered to
+  const { start: rangeStart, end: rangeEnd } = getDateRange();
+
+  // Aggregate monthly_adgroups for this tier across the full filtered date range
+  const aggr = {};
+  (ALL_DATA.monthly_adgroups || [])
+    .filter(r => {
+      const m = r.month.slice(0,7);
+      return r.gc_tier === tier && m >= rangeStart && m <= rangeEnd;
+    })
+    .forEach(r => {
+      const k = r.ad_group_name;
+      if (!aggr[k]) aggr[k] = { ad_group_name: k, mql1:0, mql2:0, sal:0, tql:0, sao:0, sao_ta:0, cw:0, cw_ta:0, cw_mrr:0, cw_mrr_ta:0, cl:0, dq:0, mql1_ta:0 };
+      Object.keys(aggr[k]).forEach(f => {
+        if (f !== 'ad_group_name') aggr[k][f] += +r[f] || 0;
+      });
+    });
+
+  const rows = Object.values(aggr)
     .filter(r => (+r[metric] || 0) > 0)
     .sort((a, b) => (+b[metric] || 0) - (+a[metric] || 0))
     .slice(0, 8);
@@ -427,7 +443,7 @@ function externalVizTooltip(context, monthsArr) {
       <span class="vtt-month">${monthLbl}</span>
     </div>
     <div class="vtt-metric">${METRIC_LABELS[metric]}: <strong>${val}</strong></div>
-    <div class="vtt-divider">Top Ad Groups — ${METRIC_LABELS[metric]}</div>
+    <div class="vtt-divider">Top Ad Groups — ${METRIC_LABELS[metric]} (filtered period)</div>
     ${barsHtml}`;
 
   // Position adjacent to cursor; el is position:fixed so coords are viewport-relative
